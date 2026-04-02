@@ -4,7 +4,7 @@ set -euo pipefail
 # --- Defaults ---
 MAX_ITERATIONS=10
 PROMPT_FILE="PROMPT.md"
-TASK_FILE="tasks.md"
+TASK_FILE="tasks.json"
 NOTEBOOK_DIR=".lnb"
 CONTEXT=""
 ARCHIVE_DIR="archive"
@@ -24,7 +24,7 @@ file (tasks.md) and a lab-notebook.
 Options:
   --max-iterations N      Safety cap (default: 10)
   --prompt FILE           Prompt template (default: PROMPT.md)
-  --task-file FILE        Task file with stories (default: tasks.md)
+  --task-file FILE        Task file with stories (default: tasks.json)
   --notebook DIR          Lab-notebook directory (default: .lnb)
   --context SLUG          Notebook context (default: derived from branch)
   --archive-dir DIR       Where to archive old runs (default: archive/)
@@ -38,7 +38,7 @@ The loop exits when:
 Each iteration the agent completes one story and outputs <promise>DONE</promise>.
 
 Example:
-  lisa.sh --max-iterations 5 --task-file tasks.md
+  lisa.sh --max-iterations 5 --task-file tasks.json
 EOF
     exit 0
 }
@@ -66,7 +66,7 @@ fi
 
 if [[ ! -f "$TASK_FILE" ]]; then
     echo "Error: Task file '$TASK_FILE' not found." >&2
-    echo "Copy the example: cp $SCRIPT_DIR/tasks.md.example tasks.md" >&2
+    echo "Copy the example: cp $SCRIPT_DIR/tasks.json.example tasks.json" >&2
     exit 1
 fi
 
@@ -81,13 +81,13 @@ else
 fi
 
 # --- Read task file metadata ---
-read_frontmatter() {
+read_task_meta() {
     local key="$1"
-    sed -n '/^---$/,/^---$/p' "$TASK_FILE" | grep "^${key}:" | sed "s/^${key}:[[:space:]]*//"
+    jq -r ".$key // empty" "$TASK_FILE" 2>/dev/null || echo ""
 }
 
-BRANCH=$(read_frontmatter "branch")
-PROJECT=$(read_frontmatter "project")
+BRANCH=$(read_task_meta "branch")
+PROJECT=$(read_task_meta "project")
 
 if [[ -z "$CONTEXT" ]]; then
     if [[ -n "$BRANCH" ]]; then

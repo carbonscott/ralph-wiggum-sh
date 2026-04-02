@@ -12,7 +12,7 @@ Available fields: issue, pr, files_changed, commit, branch, tags
 
 ## You Are One Iteration
 You are a fresh agent in a loop. Complete exactly ONE story (the first with
-unchecked items), then stop. Do NOT start a second story.
+`"passes": false`), then stop. Do NOT start a second story.
 
 ## Logging
 Log freely throughout your work using `lab-notebook emit`. Do not wait until
@@ -44,9 +44,9 @@ you notice something reusable, not at the end.
 ## Each Iteration
 
 ### 1. ORIENT — Read the task file and history
-The tasks and recent history are shown above. Find the first story with
-unchecked criteria (`- [ ]`). Check history for interrupted work on that
-story (look for `start` entries without a matching `done`).
+The tasks and recent history are shown above. Find the first story where
+`"passes": false`, ordered by `priority`. Check history for interrupted
+work on that story (look for `start` entries without a matching `done`).
 
 If resuming interrupted work, pick up where the previous iteration left off.
 
@@ -59,10 +59,12 @@ d. Plan your approach, log `type=plan`
 e. Implement — log `type=impl` as you make progress
 f. Run quality checks (typecheck, lint, test), log `type=test`
 g. If checks pass, commit: `feat: [Story ID] - [Title]`
-h. Update tasks.md: check off completed criteria with `[x]`
+h. Update tasks.json: set `"passes": true` for the completed story.
+   **Do NOT modify any other fields.** The only change you may make to
+   tasks.json is flipping `"passes": false` to `"passes": true`.
 
 ### 3. SIGNAL — Tell the harness what happened
 
-After completing the story, read tasks.md and check:
-- If more stories have unchecked items: output `<promise>DONE</promise>`
-- If ALL stories are complete: output `<promise>ALL_DONE</promise>`
+After completing the story, read tasks.json and check:
+- If any story has `"passes": false`: output `<promise>DONE</promise>`
+- If ALL stories have `"passes": true`: output `<promise>ALL_DONE</promise>`

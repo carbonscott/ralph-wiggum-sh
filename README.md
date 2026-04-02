@@ -13,8 +13,8 @@ logging (queryable history, pattern discovery).
 ```bash
 # In your project directory:
 cp ~/codes/lisa/PROMPT.md .
-cp ~/codes/lisa/tasks.md.example tasks.md
-# Edit tasks.md with your stories
+cp ~/codes/lisa/tasks.json.example tasks.json
+# Edit tasks.json with your stories
 
 # Initialize notebook with coding schema
 mkdir -p .lnb && cp ~/codes/lisa/coding-dev.yaml .lnb/schema.yaml
@@ -51,28 +51,38 @@ tasks.md (what to do)  +  .lnb/ (what happened)  +  PROMPT.md (how to do it)
 |------|---------|
 | `lisa.sh` | Runner script — the loop |
 | `PROMPT.md` | Prompt template with `<!-- FILL:xxx -->` markers |
-| `tasks.md` | Your stories with checkboxes (copy from `tasks.md.example`) |
+| `tasks.json` | Your stories with `passes` flags (copy from `tasks.json.example`) |
 | `coding-dev.yaml` | Lab-notebook schema for code dev workflows |
 
 ## Task File Format
 
-Markdown with YAML frontmatter and checkboxes:
+JSON with stories and `passes` flags. The rigid structure prevents agents
+from accidentally rewriting content — the only sanctioned mutation is
+flipping `"passes": false` to `"passes": true`.
 
-```markdown
----
-project: MyApp
-branch: lisa/feature-name
----
-# Feature Name
-
-## US-001: Story title
-- [ ] Acceptance criterion 1
-- [ ] Acceptance criterion 2
-- [ ] Typecheck passes
+```json
+{
+  "project": "MyApp",
+  "branch": "lisa/feature-name",
+  "description": "Feature description",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Story title",
+      "acceptanceCriteria": [
+        "Criterion 1",
+        "Criterion 2",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false
+    }
+  ]
+}
 ```
 
-The agent finds the first story with unchecked items, implements it,
-checks them off, and emits a promise.
+The agent finds the first story with `"passes": false` (by priority),
+implements it, sets `"passes": true`, and emits a promise.
 
 ## Notebook Schema
 
@@ -102,7 +112,7 @@ LAB_NOTEBOOK_DIR=.lnb lab-notebook sql \
 ```
 --max-iterations N      Safety cap (default: 10)
 --prompt FILE           Prompt template (default: PROMPT.md)
---task-file FILE        Task file (default: tasks.md)
+--task-file FILE        Task file (default: tasks.json)
 --notebook DIR          Notebook directory (default: .lnb)
 --context SLUG          Notebook context (default: from branch)
 --archive-dir DIR       Archive directory (default: archive/)
@@ -110,5 +120,5 @@ LAB_NOTEBOOK_DIR=.lnb lab-notebook sql \
 
 ## Archive
 
-When the `branch` field in `tasks.md` changes between runs, Lisa archives
+When the `branch` field in `tasks.json` changes between runs, Lisa archives
 the previous task file and notebook to `archive/<date>-<branch>/`.

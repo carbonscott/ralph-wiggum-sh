@@ -1,0 +1,40 @@
+{
+  "project": "MyApp",
+  "branch": "lisa/task-priority",
+  "description": "Task Priority System — add priority levels to tasks",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Add priority field to database",
+      "acceptanceCriteria": [
+        "Add priority column to tasks table: high | medium | low (default medium)",
+        "Generate and run migration successfully",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false
+    },
+    {
+      "id": "US-002",
+      "title": "Display priority badge on task cards",
+      "acceptanceCriteria": [
+        "Colored priority badge (red=high, yellow=medium, gray=low)",
+        "Priority visible in list view without hovering",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false
+    },
+    {
+      "id": "US-003",
+      "title": "Add priority selector to task edit form",
+      "acceptanceCriteria": [
+        "Priority dropdown in task edit modal",
+        "Saves on selection change",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false
+    }
+  ]
+}
