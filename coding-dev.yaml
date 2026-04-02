@@ -1,0 +1,28 @@
+# Code development loop — track implementation progress, test results, and patterns.
+# Use this schema with Lisa (or any coding agent loop) to record the
+# development narrative: what was built, what broke, what patterns emerged.
+#
+# Core fields (id, ts, writer_id, context, type, content) are always present.
+# Run `lab-notebook rebuild` after changing this file.
+
+types:
+  - start       # beginning work on a task/story
+  - plan        # implementation approach decided
+  - impl        # progress during implementation (partial work, files changed)
+  - test        # test results (pass/fail, what was tested)
+  - review      # PR review feedback received
+  - fix         # changes made in response to review feedback
+  - pattern     # reusable codebase pattern discovered
+  - blocker     # something blocking progress
+  - done        # task completed successfully
+  - dead-end    # approach abandoned with rationale
+
+# Field types: text, integer, real, list
+# Add fts: true to include a field in full-text search (content is always indexed).
+fields:
+  issue:          {type: text, fts: true}   # story/issue ID (e.g. US-001, #42)
+  pr:             {type: text}              # PR number or URL
+  files_changed:  {type: list}             # comma-separated file paths
+  commit:         {type: text}              # commit SHA
+  branch:         {type: text}              # branch name
+  tags:           {type: list}              # comma-separated on CLI
