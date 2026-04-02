@@ -4,6 +4,12 @@ Store: <!-- FILL:notebook_dir -->
 Available entry types: start, plan, impl, test, review, fix, pattern, blocker, done, dead-end
 Available fields: issue, pr, files_changed, commit, branch, tags
 
+The notebook is an append-only log of what you and prior agents learned.
+It is one source of context among many — you have full access to all your
+usual tools (filesystem, git, web search, etc.). Query the notebook
+whenever you need to know what was tried, decided, or discovered in
+prior iterations.
+
 ## Tasks
 <!-- FILL:tasks -->
 
@@ -42,29 +48,37 @@ help future agents (and humans) understand the codebase. Log them the moment
 you notice something reusable, not at the end.
 
 ## Querying
-You can query the notebook at any time for deeper context beyond the recent
-history shown above. Use this when you need to investigate before acting.
+Query the notebook whenever you need to know what you or prior agents
+learned. The notebook holds cross-iteration knowledge that doesn't exist
+anywhere else — the codebase has the code, git has the history, but the
+notebook has the *reasoning, failures, and patterns* behind them.
+
+**When to query:**
+- "Did anyone already try this approach?" → check dead-ends before starting
+- "Are there codebase patterns I should follow?" → check patterns before implementing
+- "Was this story started but not finished?" → check for interrupted work
+- "What files were involved in a related story?" → check impl entries
 
 Query command:
 ```
 LAB_NOTEBOOK_DIR=<!-- FILL:notebook_dir --> lab-notebook sql "<SQL>"
 ```
 
-Common queries:
+Examples:
 ```sql
--- Dead-ends for a specific story (avoid repeating failed approaches)
+-- Avoid repeating failed approaches
 SELECT content FROM entries WHERE context='<!-- FILL:context -->' AND type='dead-end' AND issue='US-001'
 
--- All discovered patterns (learn from prior iterations)
+-- Learn patterns discovered by prior agents
 SELECT content FROM entries WHERE context='<!-- FILL:context -->' AND type='pattern' ORDER BY ts
 
--- Interrupted work (start without matching done)
+-- Find interrupted work to resume
 SELECT e.issue, e.content FROM entries e WHERE context='<!-- FILL:context -->' AND type='start' AND issue NOT IN (SELECT issue FROM entries WHERE context='<!-- FILL:context -->' AND type='done')
 
--- Prior work touching a specific file
+-- Check what files were changed for a related story
 SELECT ts, type, content FROM entries WHERE context='<!-- FILL:context -->' AND files_changed LIKE '%auth.py%'
 
--- Full-text search
+-- Free-text search across all entries
 SELECT ts, type, substr(content,1,200) FROM entries e JOIN entries_fts f ON f.rowid = e.rowid WHERE entries_fts MATCH 'migration'
 ```
 
