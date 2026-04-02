@@ -41,6 +41,37 @@ Pattern entries are especially valuable — they persist across iterations and
 help future agents (and humans) understand the codebase. Log them the moment
 you notice something reusable, not at the end.
 
+## Querying
+You can query the notebook at any time for deeper context beyond the recent
+history shown above. Use this when you need to investigate before acting.
+
+Query command:
+```
+LAB_NOTEBOOK_DIR=<!-- FILL:notebook_dir --> lab-notebook sql "<SQL>"
+```
+
+Common queries:
+```sql
+-- Dead-ends for a specific story (avoid repeating failed approaches)
+SELECT content FROM entries WHERE context='<!-- FILL:context -->' AND type='dead-end' AND issue='US-001'
+
+-- All discovered patterns (learn from prior iterations)
+SELECT content FROM entries WHERE context='<!-- FILL:context -->' AND type='pattern' ORDER BY ts
+
+-- Interrupted work (start without matching done)
+SELECT e.issue, e.content FROM entries e WHERE context='<!-- FILL:context -->' AND type='start' AND issue NOT IN (SELECT issue FROM entries WHERE context='<!-- FILL:context -->' AND type='done')
+
+-- Prior work touching a specific file
+SELECT ts, type, content FROM entries WHERE context='<!-- FILL:context -->' AND files_changed LIKE '%auth.py%'
+
+-- Full-text search
+SELECT ts, type, substr(content,1,200) FROM entries e JOIN entries_fts f ON f.rowid = e.rowid WHERE entries_fts MATCH 'migration'
+```
+
+You are not limited to these examples. The entries table has columns:
+`ts, type, issue, content, branch, tags, files_changed, commit, pr`.
+Compose any query you need.
+
 ## Each Iteration
 
 ### 1. ORIENT — Read the task file and history
