@@ -7,7 +7,6 @@ PROMPT_FILE="PROMPT.md"
 TASK_FILE="tasks.md"
 NOTEBOOK_DIR=".lnb"
 CONTEXT=""
-TOOL="claude"
 ARCHIVE_DIR="archive"
 COMPLETION_PROMISE="DONE"
 ALL_DONE_PROMISE="ALL_DONE"
@@ -19,8 +18,8 @@ usage() {
 Usage: lisa.sh [OPTIONS]
 
 Autonomous agent loop for code development tasks.
-Spawns a fresh Claude (or Amp) instance per iteration, tracking state
-via a task file (tasks.md) and a lab-notebook.
+Spawns a fresh Claude instance per iteration, tracking state via a task
+file (tasks.md) and a lab-notebook.
 
 Options:
   --max-iterations N      Safety cap (default: 10)
@@ -28,7 +27,6 @@ Options:
   --task-file FILE        Task file with stories (default: tasks.md)
   --notebook DIR          Lab-notebook directory (default: .lnb)
   --context SLUG          Notebook context (default: derived from branch)
-  --tool claude|amp       Which agent to invoke (default: claude)
   --archive-dir DIR       Where to archive old runs (default: archive/)
   -h, --help              Show this help
 
@@ -53,7 +51,6 @@ while [[ $# -gt 0 ]]; do
         --task-file)       TASK_FILE="$2"; shift 2 ;;
         --notebook)        NOTEBOOK_DIR="$2"; shift 2 ;;
         --context)         CONTEXT="$2"; shift 2 ;;
-        --tool)            TOOL="$2"; shift 2 ;;
         --archive-dir)     ARCHIVE_DIR="$2"; shift 2 ;;
         -h|--help)         usage ;;
         *)                 echo "Unknown option: $1" >&2; usage ;;
@@ -73,27 +70,14 @@ if [[ ! -f "$TASK_FILE" ]]; then
     exit 1
 fi
 
-if [[ "$TOOL" != "claude" && "$TOOL" != "amp" ]]; then
-    echo "Error: --tool must be 'claude' or 'amp'." >&2
-    exit 1
-fi
-
 # Resolve the claude command
-if [[ "$TOOL" == "claude" ]]; then
-    if command -v claude &>/dev/null; then
-        AGENT_CMD="claude"
-    elif command -v claude-code &>/dev/null; then
-        AGENT_CMD="claude-code"
-    else
-        echo "Error: claude (or claude-code) not found in PATH." >&2
-        exit 1
-    fi
+if command -v claude &>/dev/null; then
+    CLAUDE_CMD="claude"
+elif command -v claude-code &>/dev/null; then
+    CLAUDE_CMD="claude-code"
 else
-    AGENT_CMD="amp"
-    if ! command -v amp &>/dev/null; then
-        echo "Error: amp not found in PATH." >&2
-        exit 1
-    fi
+    echo "Error: claude (or claude-code) not found in PATH." >&2
+    exit 1
 fi
 
 # --- Read task file metadata ---
@@ -224,7 +208,6 @@ echo "Branch:     ${BRANCH:-<none>}"
 echo "Context:    $CONTEXT"
 echo "Task file:  $TASK_FILE"
 echo "Notebook:   $NOTEBOOK_DIR"
-echo "Tool:       $TOOL"
 echo "Max iter:   $MAX_ITERATIONS"
 echo "============="
 
@@ -240,17 +223,12 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
 
     # Run the agent
     exit_code=0
-    if [[ "$TOOL" == "claude" ]]; then
-        $AGENT_CMD \
-            --permission-mode acceptEdits \
-            --print --output-format stream-json \
-            "$prompt" 2>&1 \
-            | tee "$TMPFILE" \
-            | format_stream || exit_code=$?
-    else
-        echo "$prompt" | $AGENT_CMD --dangerously-allow-all 2>&1 \
-            | tee "$TMPFILE" || exit_code=$?
-    fi
+    $CLAUDE_CMD \
+        --permission-mode acceptEdits \
+        --print --output-format stream-json \
+        "$prompt" 2>&1 \
+        | tee "$TMPFILE" \
+        | format_stream || exit_code=$?
 
     if [[ $exit_code -ne 0 ]]; then
         echo "Agent exited with code $exit_code"

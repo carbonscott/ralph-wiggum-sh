@@ -1,7 +1,7 @@
 # Lisa
 
-Autonomous agent loop for code development. Spawns a fresh Claude (or Amp)
-instance per iteration. Each iteration completes one story, logs progress to
+Autonomous agent loop for code development. Spawns a fresh Claude instance
+per iteration. Each iteration completes one story, logs progress to
 a [lab-notebook](https://github.com/carbonscott/lab-notebook), and moves on.
 
 Combines the best of [Ralph](https://github.com/mikeyobrien/ralph-orchestrator)
@@ -105,7 +105,6 @@ LAB_NOTEBOOK_DIR=.lnb lab-notebook sql \
 --task-file FILE        Task file (default: tasks.md)
 --notebook DIR          Notebook directory (default: .lnb)
 --context SLUG          Notebook context (default: from branch)
---tool claude|amp       Agent to use (default: claude)
 --archive-dir DIR       Archive directory (default: archive/)
 ```
 
