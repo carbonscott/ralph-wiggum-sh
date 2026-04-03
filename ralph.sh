@@ -237,13 +237,18 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
         break
     fi
 
-    # Check for promises (ALL_DONE first since it also contains DONE)
-    if grep -q "<promise>${ALL_DONE_PROMISE}</promise>" "$TMPFILE" 2>/dev/null; then
+    # Extract only assistant text from stream-json for promise detection.
+    # Grepping the raw TMPFILE would match promise strings found in tool
+    # results (e.g. when the agent reads PROMPT.md or ralph.sh).
+    AGENT_TEXT=$(jq -r 'select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text' "$TMPFILE" 2>/dev/null || true)
+
+    # Check for promises (ALL_DONE first since DONE is a substring)
+    if echo "$AGENT_TEXT" | grep -q "<promise>${ALL_DONE_PROMISE}</promise>"; then
         echo ""
         echo "=== All stories complete! ==="
         log_to_notebook "done" "ralph.sh: all stories complete at iteration $i"
         break
-    elif grep -q "<promise>${COMPLETION_PROMISE}</promise>" "$TMPFILE" 2>/dev/null; then
+    elif echo "$AGENT_TEXT" | grep -q "<promise>${COMPLETION_PROMISE}</promise>"; then
         echo ""
         echo "=== Iteration $i: story complete, continuing ==="
         log_to_notebook "done" "ralph.sh: story completed at iteration $i, continuing"
