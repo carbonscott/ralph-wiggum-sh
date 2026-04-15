@@ -68,15 +68,17 @@ For `i` in `1..max-iterations`:
 1. **Build the prompt.** Call:
 
    ```
-   Bash("~/codes/ralph-wiggum-lnb/cc/ralph-prep.sh --iteration i --max-iterations N --task-file <task-file>")
+   Bash("$HOME/codes/ralph-wiggum-lnb/cc/ralph-prep.sh --iteration i --max-iterations N --task-file <task-file>")
    ```
 
    Pass the same `N` you parsed in Setup so the start log entry records
    the cap alongside the iteration number (matches `ralph.sh`'s log
    format). Capture the tool result's stdout. This is the filled
    prompt. Do not read, quote, or summarize it — just hold it for the
-   next step. (If the repo lives somewhere other than
-   `~/codes/ralph-wiggum-lnb`, substitute your checkout path.)
+   next step. Use `$HOME/...` (not `~/...`) inside `Bash()` — the tilde
+   only expands when unquoted, so `$HOME` is safer if the path later
+   gets wrapped in quotes. If the repo lives somewhere other than
+   `$HOME/codes/ralph-wiggum-lnb`, substitute your checkout path.
 
 2. **Spawn the worker.** Call:
 

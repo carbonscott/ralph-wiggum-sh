@@ -11,7 +11,15 @@ ARCHIVE_DIR="archive"
 COMPLETION_PROMISE="DONE"
 ALL_DONE_PROMISE="ALL_DONE"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve symlinks so SHARED_DIR is correct when the runner is symlinked
+# into $PATH. Walks a chain of relative or absolute symlinks.
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+    DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
 SHARED_DIR="$SCRIPT_DIR/../shared"
 
 usage() {
