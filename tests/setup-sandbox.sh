@@ -16,9 +16,14 @@ cat <<EOF
 Sandbox ready: $SANDBOX
 
 Headless mode:
-  cd $SANDBOX && $REPO_DIR/cc-headless/ralph.sh --max-iterations 3
+  cd $SANDBOX && ralph --max-iterations 3
 
 Claude Code mode:
   cd $SANDBOX && claude
-  then in the session: follow $REPO_DIR/cc/RALPH-CC.md, max-iterations 3
+  then in the session: /ralph-lnb max-iterations 3
+
+Not installed yet? Run $REPO_DIR/install.sh first, or use the
+absolute-path fallback:
+  $REPO_DIR/cc-headless/ralph.sh --max-iterations 3
+  follow $REPO_DIR/cc/RALPH-CC.md, max-iterations 3
 EOF

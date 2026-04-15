@@ -1,0 +1,129 @@
+---
+name: ralph-lnb
+description: "Run the Ralph Wiggum autonomous code loop inside a Claude Code session. Use when the user types /ralph-lnb, or says 'run ralph', 'start the ralph loop', 'keep iterating on the tasks', or asks to work through tasks.json story-by-story. Each iteration spawns a fresh subagent to complete one story and logs progress to the lab notebook."
+user-invocable: true
+argument-hint: "[max-iterations N] [task-file FILE]"
+---
+
+<!-- Managed by ralph-wiggum-lnb install.sh — do not edit by hand. Re-run ./install.sh from the repo to regenerate. -->
+
+# Ralph Loop — Claude Code Session Skill
+
+This skill runs the ralph loop (one story per iteration, fresh subagent each time, logs to `.lnb/`) using the `Agent()` subagent tool inside the current Claude Code chat. It is the skill-based equivalent of `@@RALPH_REPO@@/cc-headless/ralph.sh`, which spawns `claude -p` per iteration instead.
+
+The ralph repo this skill was generated from lives at:
+
+    @@RALPH_REPO@@
+
+If that path is stale (you moved or re-cloned the repo), re-run `./install.sh` from the new location to regenerate this file.
+
+## Parse arguments
+
+Parse `$ARGUMENTS` as a whitespace-separated list of `key value` pairs. Supported keys:
+
+| Key | Default | Notes |
+|---|---|---|
+| `max-iterations` | `10` | Safety cap on the loop |
+| `task-file` | `tasks.json` | Path to the task file (relative to cwd) |
+
+Everything else gets ignored. Examples of valid argument strings:
+
+- *(empty)* — use all defaults
+- `max-iterations 5`
+- `max-iterations 3 task-file sprint.json`
+
+## Prerequisites (verify before starting)
+
+1. The current Claude Code session must be in `acceptEdits` permission mode (or the user must approve each subagent tool call manually). Subagents inherit the parent session's permission mode. This replaces `cc-headless/ralph.sh`'s `--permission-mode acceptEdits` flag.
+2. `<task-file>` must exist in the current working directory and contain stories in the format described at `@@RALPH_REPO@@/shared/tasks.json.example`.
+3. A `PROMPT.md` must exist in the current working directory. If it doesn't, tell the user:
+
+   > No `PROMPT.md` in this directory. Copy it from the repo first:
+   > ```
+   > cp @@RALPH_REPO@@/shared/PROMPT.md .
+   > ```
+
+   Wait for them to do that (or confirm they want you to do it), then proceed.
+4. `jq` and `lab-notebook` must be on `$PATH`. If missing, tell the user and stop.
+
+## Procedure
+
+When invoked, the main session (you) must do the following. Do not deviate, do not add steps, do not narrate beyond the minimum specified.
+
+### Setup
+
+1. Parse `max-iterations` and `task-file` from `$ARGUMENTS`. Apply the defaults above for anything unspecified.
+2. Derive the notebook context once, so every subsequent log call uses the same value:
+
+   ```
+   Bash("jq -r '.branch // .project // \"ralph-dev\"' <task-file>")
+   ```
+
+   Capture stdout into `<context>`. This mirrors how `ralph-prep.sh` derives it, so both runners agree on the context slug.
+3. Announce once: `"Starting ralph loop, max-iterations=N, task-file=X, context=<context>"`. One line, nothing more.
+
+### Loop
+
+For `i` in `1..max-iterations`:
+
+1. **Build the prompt.** Call:
+
+   ```
+   Bash("@@RALPH_REPO@@/cc/ralph-prep.sh --iteration i --max-iterations N --task-file <task-file>")
+   ```
+
+   Pass the same `N` you parsed in Setup so the start log entry records the cap alongside the iteration number (matches `cc-headless/ralph.sh`'s log format). Capture the tool result's stdout. This is the filled prompt. Do not read, quote, or summarize it — just hold it for the next step.
+
+2. **Spawn the worker.** Call:
+
+   ```
+   Agent(
+       subagent_type="general-purpose",
+       description="ralph iteration i",
+       prompt=<stdout from step 1>
+   )
+   ```
+
+   The subagent will complete one story and return a final message ending with either `<promise>DONE</promise>` or `<promise>ALL_DONE</promise>`.
+
+3. **Check the return.** Inspect the subagent's final message. **Check `ALL_DONE` first — `<promise>ALL_DONE</promise>` contains `<promise>DONE</promise>` as a substring, so the order is load-bearing.** (Same reason `cc-headless/ralph.sh`'s grep checks `ALL_DONE` before `DONE`.)
+
+   - Contains `<promise>ALL_DONE</promise>`:
+     - Call `Bash("LAB_NOTEBOOK_DIR=<notebook> lab-notebook emit --context <context> --type done --tags ralph-harness 'ralph-lnb: all stories complete at iteration i'")` using the `<context>` derived in Setup step 2.
+     - Break the loop. Go to "Post-loop".
+   - Contains `<promise>DONE</promise>`:
+     - Say exactly: `"iteration i: DONE, continuing"`. One line.
+     - Continue to next iteration.
+   - Neither marker:
+     - Call `Bash(...)` to log a blocker entry (same shape as above but `--type blocker` and `"ralph-lnb: iteration i ended without promise"`).
+     - Break the loop. Go to "Post-loop".
+
+### Post-loop
+
+1. If the loop ended on `ALL_DONE`, optionally query the notebook for a summary, using the `<context>` derived in Setup step 2:
+
+   ```
+   Bash("LAB_NOTEBOOK_DIR=<notebook> lab-notebook sql \"SELECT ts, type, issue, substr(content,1,200) FROM entries WHERE context='<context>' AND type IN ('start','done','impl','blocker') ORDER BY ts\"")
+   ```
+
+   Report a 3-5 sentence summary to the user covering what each story accomplished.
+
+2. If the loop ended on `max-iterations`, report: `"Hit iteration cap (N). Stopped. Check .lnb/ for progress."`
+
+3. If the loop ended on a missing marker, report: `"Iteration i returned without a promise marker. Stopped. Check .lnb/ for the blocker entry and the subagent's final message."`
+
+## Stop conditions (summary)
+
+- `<promise>ALL_DONE</promise>` seen → success.
+- `max-iterations` reached → capped.
+- No promise marker in a subagent return → blocker.
+
+## Context budgeting
+
+Each iteration adds ~50 tokens (the subagent's final narration plus the promise marker) to the main session's context. A 20-iteration run is roughly 1k tokens — acceptable. Keep your own between-iteration narration to one short line (`"iteration i: DONE, continuing"`). Do not summarize subagent output, do not re-read `tasks.json` yourself (`ralph-prep.sh` already does it every iteration), do not print anything the user doesn't need.
+
+## Relationship to the headless runner
+
+The headless runner `@@RALPH_REPO@@/cc-headless/ralph.sh` uses the same `ralph-prep.sh`, `shared/ralph-lib.sh`, `shared/PROMPT.md`, `tasks.json`, and `.lnb/` state. A change to `shared/ralph-lib.sh` affects both runners. The only difference is who spawns the per-iteration agent: `claude -p` in headless, `Agent()` in this skill.
+
+$ARGUMENTS
