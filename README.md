@@ -50,7 +50,10 @@ cp ~/codes/ralph-wiggum-lnb/shared/tasks.json.example tasks.json
 
 The runner uses `shared/PROMPT.md` from the installed repo by default.
 Copy it locally and pass `--prompt ./PROMPT.md` only if you want to
-customize the template.
+customize the template. **Upgrading from an older checkout?** A stale
+`./PROMPT.md` in your project dir is no longer auto-picked up — delete
+it if you never customized it, or pass `--prompt ./PROMPT.md`
+explicitly if you did.
 
 The runner auto-initializes `.lnb/` with the coding schema on the first
 iteration — no manual `lab-notebook init` needed.

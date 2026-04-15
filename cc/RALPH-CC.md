@@ -65,8 +65,11 @@ minimum specified.
 
    Capture stdout into `<context>`. This mirrors how `ralph-prep.sh`
    derives it, so both runners agree on the context slug.
-3. Announce once: `"Starting ralph loop, max-iterations=N, task-file=X, context=<context>"`.
-   One line, nothing more.
+3. Announce once: `"Starting ralph loop, max-iterations=N, task-file=X, prompt=P, context=<context>"`.
+   One line, nothing more. Use the user-supplied prompt path for `P`
+   if they passed one; otherwise use the literal string
+   `shared/PROMPT.md` so readers can tell at a glance which template
+   is in play.
 
 ### Loop
 
