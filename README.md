@@ -19,10 +19,27 @@ cp ~/codes/ralph-wiggum-lnb/tasks.json.example tasks.json
 # Initialize notebook with coding schema
 mkdir -p .lnb && cp ~/codes/ralph-wiggum-lnb/coding-dev.yaml .lnb/schema.yaml
 lab-notebook init .lnb
+```
 
-# Run
+Then pick one runner:
+
+**Headless** (uses `claude -p`):
+
+```bash
 ~/codes/ralph-wiggum-lnb/ralph.sh --max-iterations 5
 ```
+
+**Inside a Claude Code session** (uses the `Agent()` subagent tool — no `-p` needed):
+
+```bash
+# Copy the driver doc + helper scripts into your project
+cp ~/codes/ralph-wiggum-lnb/{RALPH-CC.md,ralph-prep.sh,ralph-lib.sh} .
+chmod +x ralph-prep.sh
+```
+
+Start Claude Code in `acceptEdits` mode, then in the session:
+
+> follow RALPH-CC.md, max-iterations 5
 
 ## How It Works
 
@@ -31,7 +48,7 @@ tasks.json (what to do)  +  .lnb/ (what happened)  +  PROMPT.md (how to do it)
            │                       │                           │
            └───────────┬───────────┘                           │
                        ▼                                       │
-              ralph.sh builds prompt ◄─────────────────────────┘
+              runner   builds prompt ◄─────────────────────────┘
                      │
               ┌──────┴──────────────────────┐
               │  for each iteration:        │
@@ -45,11 +62,29 @@ tasks.json (what to do)  +  .lnb/ (what happened)  +  PROMPT.md (how to do it)
               └─────────────────────────────┘
 ```
 
+## Two runners, same loop
+
+Ralph ships two entry points that share the same `PROMPT.md`, `tasks.json`,
+`.lnb/`, and `archive/` state:
+
+- **`ralph.sh`** — the original. Runs in a terminal, spawns a fresh
+  `claude -p` per iteration. Truly stateless outer loop.
+- **`RALPH-CC.md`** — drop-in alternative that runs inside a live Claude
+  Code chat session and uses the `Agent()` subagent tool. Use when `-p`
+  mode is unavailable or restricted. See `RALPH-CC.md` for the full
+  invocation recipe and stop-condition semantics.
+
+Both modes complete one story per iteration, emit `<promise>DONE</promise>`
+or `<promise>ALL_DONE</promise>`, and keep state in the same places.
+
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | Runner script — the loop |
+| `ralph.sh` | Headless runner — uses `claude -p` |
+| `ralph-lib.sh` | Shared bash helpers sourced by `ralph.sh` and `ralph-prep.sh` |
+| `ralph-prep.sh` | Per-iteration bookkeeping + prompt builder; stdout is the filled prompt |
+| `RALPH-CC.md` | Driver doc for the Claude Code session runner |
 | `PROMPT.md` | Prompt template with `<!-- FILL:xxx -->` markers |
 | `tasks.json` | Your stories with `passes` flags (copy from `tasks.json.example`) |
 | `coding-dev.yaml` | Lab-notebook schema for code dev workflows |
@@ -107,7 +142,7 @@ LAB_NOTEBOOK_DIR=.lnb lab-notebook sql \
   "SELECT content FROM entries WHERE type='pattern' ORDER BY ts"
 ```
 
-## Options
+## `ralph.sh` options
 
 ```
 --max-iterations N      Safety cap (default: 10)
@@ -118,7 +153,11 @@ LAB_NOTEBOOK_DIR=.lnb lab-notebook sql \
 --archive-dir DIR       Archive directory (default: archive/)
 ```
 
+For the Claude Code session runner, `max-iterations`, `task-file`, and
+related parameters are passed inline when invoking the driver doc — see
+`RALPH-CC.md`.
+
 ## Archive
 
-When the `branch` field in `tasks.json` changes between runs, Ralph archives
-the previous task file and notebook to `archive/<date>-<branch>/`.
+When the `branch` field in `tasks.json` changes between runs, both runners
+archive the previous task file and notebook to `archive/<date>-<branch>/`.
