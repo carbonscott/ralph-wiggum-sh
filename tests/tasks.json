@@ -1,0 +1,27 @@
+{
+  "project": "sandbox",
+  "branch": "ralph/smoke-test",
+  "description": "Smoke test fixture for ralph harness",
+  "stories": [
+    {
+      "id": "US-001",
+      "title": "Create hello.txt with greeting",
+      "acceptanceCriteria": [
+        "File hello.txt exists at repo root",
+        "File contains the text 'hello from ralph'"
+      ],
+      "priority": 1,
+      "passes": false
+    },
+    {
+      "id": "US-002",
+      "title": "Append line to hello.txt",
+      "acceptanceCriteria": [
+        "hello.txt contains a second line: 'smoke test passed'",
+        "Original first line is preserved"
+      ],
+      "priority": 2,
+      "passes": false
+    }
+  ]
+}
