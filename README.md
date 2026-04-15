@@ -12,34 +12,32 @@ structured notebook logging (queryable history, pattern discovery). See also
 
 ```bash
 # In your project directory:
-cp ~/codes/ralph-wiggum-lnb/PROMPT.md .
-cp ~/codes/ralph-wiggum-lnb/tasks.json.example tasks.json
+cp ~/codes/ralph-wiggum-lnb/shared/PROMPT.md .
+cp ~/codes/ralph-wiggum-lnb/shared/tasks.json.example tasks.json
 # Edit tasks.json with your stories
-
-# Initialize notebook with coding schema
-mkdir -p .lnb && cp ~/codes/ralph-wiggum-lnb/coding-dev.yaml .lnb/schema.yaml
-lab-notebook init .lnb
 ```
+
+The runner auto-initializes `.lnb/` with the coding schema on the first
+iteration — no manual `lab-notebook init` needed.
 
 Then pick one runner:
 
 **Headless** (uses `claude -p`):
 
 ```bash
-~/codes/ralph-wiggum-lnb/ralph.sh --max-iterations 5
+~/codes/ralph-wiggum-lnb/cc-headless/ralph.sh --max-iterations 5
 ```
 
 **Inside a Claude Code session** (uses the `Agent()` subagent tool — no `-p` needed):
 
-```bash
-# Copy the driver doc + helper scripts + notebook schema into your project
-cp ~/codes/ralph-wiggum-lnb/{RALPH-CC.md,ralph-prep.sh,ralph-lib.sh,coding-dev.yaml} .
-chmod +x ralph-prep.sh
-```
-
 Start Claude Code in `acceptEdits` mode, then in the session:
 
-> follow RALPH-CC.md, max-iterations 5
+> follow ~/codes/ralph-wiggum-lnb/cc/RALPH-CC.md, max-iterations 5
+
+No extra files need to live in your project dir — `PROMPT.md` +
+`tasks.json` is the entire footprint. Helper scripts, the shared lib,
+and the notebook schema all stay in the repo and are invoked or sourced
+by absolute path.
 
 ## How It Works
 
@@ -67,27 +65,36 @@ tasks.json (what to do)  +  .lnb/ (what happened)  +  PROMPT.md (how to do it)
 Ralph ships two entry points that share the same `PROMPT.md`, `tasks.json`,
 `.lnb/`, and `archive/` state:
 
-- **`ralph.sh`** — the original. Runs in a terminal, spawns a fresh
-  `claude -p` per iteration. Truly stateless outer loop.
-- **`RALPH-CC.md`** — drop-in alternative that runs inside a live Claude
-  Code chat session and uses the `Agent()` subagent tool. Use when `-p`
-  mode is unavailable or restricted. See `RALPH-CC.md` for the full
-  invocation recipe and stop-condition semantics.
+- **`cc-headless/ralph.sh`** — the original. Runs in a terminal, spawns
+  a fresh `claude -p` per iteration. Truly stateless outer loop.
+- **`cc/RALPH-CC.md`** — drop-in alternative that runs inside a live
+  Claude Code chat session and uses the `Agent()` subagent tool. Use
+  when `-p` mode is unavailable or restricted. See `cc/RALPH-CC.md` for
+  the full invocation recipe and stop-condition semantics.
 
 Both modes complete one story per iteration, emit `<promise>DONE</promise>`
 or `<promise>ALL_DONE</promise>`, and keep state in the same places.
+
+## Layout
+
+The repo splits into three directories so the mode boundary is obvious:
+
+- `cc-headless/` — files specific to the headless `claude -p` runner
+- `cc/` — files specific to the in-session Claude Code runner
+- `shared/` — prompt template, shared bash helpers, notebook schema, and
+  task file example used by both runners
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `ralph.sh` | Headless runner — uses `claude -p` |
-| `ralph-lib.sh` | Shared bash helpers sourced by `ralph.sh` and `ralph-prep.sh` |
-| `ralph-prep.sh` | Per-iteration bookkeeping + prompt builder; stdout is the filled prompt |
-| `RALPH-CC.md` | Driver doc for the Claude Code session runner |
-| `PROMPT.md` | Prompt template with `<!-- FILL:xxx -->` markers |
-| `tasks.json` | Your stories with `passes` flags (copy from `tasks.json.example`) |
-| `coding-dev.yaml` | Lab-notebook schema for code dev workflows |
+| `cc-headless/ralph.sh` | Headless runner — uses `claude -p` |
+| `cc/RALPH-CC.md` | Driver doc for the Claude Code session runner |
+| `cc/ralph-prep.sh` | Per-iteration bookkeeping + prompt builder; stdout is the filled prompt |
+| `shared/ralph-lib.sh` | Shared bash helpers sourced by both runners |
+| `shared/PROMPT.md` | Prompt template with `<!-- FILL:xxx -->` markers |
+| `shared/tasks.json.example` | Starter task file (copy to your project as `tasks.json`) |
+| `shared/coding-dev.yaml` | Lab-notebook schema for code dev workflows |
 
 ## Task File Format
 
@@ -142,7 +149,7 @@ LAB_NOTEBOOK_DIR=.lnb lab-notebook sql \
   "SELECT content FROM entries WHERE type='pattern' ORDER BY ts"
 ```
 
-## `ralph.sh` options
+## `cc-headless/ralph.sh` options
 
 ```
 --max-iterations N      Safety cap (default: 10)
@@ -155,7 +162,7 @@ LAB_NOTEBOOK_DIR=.lnb lab-notebook sql \
 
 For the Claude Code session runner, `max-iterations`, `task-file`, and
 related parameters are passed inline when invoking the driver doc — see
-`RALPH-CC.md`.
+`cc/RALPH-CC.md`.
 
 ## Archive
 

@@ -1,8 +1,11 @@
 # Shared helpers for ralph.sh and ralph-prep.sh.
-# Source this file after defining: SCRIPT_DIR, PROMPT_FILE, TASK_FILE,
-# NOTEBOOK_DIR, CONTEXT, ARCHIVE_DIR, LAST_BRANCH_FILE. The functions
-# below also use BRANCH and PROJECT, which callers typically resolve via
-# read_task_meta after sourcing.
+# Source this file after defining: SCRIPT_DIR, SHARED_DIR, PROMPT_FILE,
+# TASK_FILE, NOTEBOOK_DIR, CONTEXT, ARCHIVE_DIR, LAST_BRANCH_FILE. The
+# functions below also use BRANCH and PROJECT, which callers typically
+# resolve via read_task_meta after sourcing.
+#
+# SHARED_DIR must point at the repo's shared/ directory so ensure_notebook
+# can locate coding-dev.yaml. Both runners set it as "$SCRIPT_DIR/../shared".
 
 # --- Read task file metadata ---
 read_task_meta() {
@@ -38,34 +41,18 @@ archive_previous_run() {
 # --- Notebook helpers ---
 ensure_notebook() {
     if [[ ! -d "$NOTEBOOK_DIR" ]]; then
-        # `lab-notebook init` (no positional arg) reliably creates
-        # `.lnb/` in cwd. Passing a positional arg triggers a
-        # path-doubling quirk that nests the real notebook at
-        # `<dir>/.lnb`, leaving any pre-placed schema.yaml as a ghost
-        # file. Stick with the default, then rename if the caller
-        # wanted a non-default notebook name.
-        lab-notebook init >/dev/null 2>&1 || true
+        # lab-notebook init always creates a `.lnb` subfolder in cwd and
+        # loads the schema from --template-path directly, so no separate
+        # cp + rebuild step is needed.
+        lab-notebook init --template-path "$SHARED_DIR/coding-dev.yaml" >/dev/null
 
+        # Rename if the caller wants a non-default notebook dir, and
+        # patch .lnb.env so lab-notebook calls still find the notebook.
         if [[ "$NOTEBOOK_DIR" != ".lnb" && -d ".lnb" && ! -d "$NOTEBOOK_DIR" ]]; then
             mv .lnb "$NOTEBOOK_DIR"
-            # Keep .lnb.env pointing at the renamed notebook so
-            # lab-notebook calls without an explicit LAB_NOTEBOOK_DIR
-            # env var still find it.
             if [[ -f .lnb.env ]]; then
                 sed -i.bak "s|/\\.lnb$|/$NOTEBOOK_DIR|" .lnb.env && rm -f .lnb.env.bak
             fi
-        fi
-
-        # lab-notebook init installs its default schema
-        # (`research-notebook`). Overwrite with coding-dev.yaml when
-        # available, then rebuild the index so the SQLite type
-        # vocabulary matches. If coding-dev.yaml isn't available,
-        # warn once on stderr — ralph agents expect coding-dev types.
-        if [[ -f "$SCRIPT_DIR/coding-dev.yaml" && -d "$NOTEBOOK_DIR" ]]; then
-            cp "$SCRIPT_DIR/coding-dev.yaml" "$NOTEBOOK_DIR/schema.yaml"
-            LAB_NOTEBOOK_DIR="$NOTEBOOK_DIR" lab-notebook rebuild >/dev/null 2>&1 || true
-        else
-            echo "Warning: $SCRIPT_DIR/coding-dev.yaml not found — notebook uses lab-notebook's default schema (research-notebook). Ralph agents expect coding-dev types (start/plan/impl/test/done)." >&2
         fi
 
         echo "Initialized notebook at $NOTEBOOK_DIR" >&2

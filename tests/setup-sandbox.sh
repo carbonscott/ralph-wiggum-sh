@@ -6,19 +6,19 @@ SANDBOX="${TMPDIR:-/tmp}/ralph-smoke-$(date +%Y%m%d-%H%M%S)"
 
 mkdir -p "$SANDBOX"
 
-for f in PROMPT.md ralph.sh ralph-prep.sh ralph-lib.sh RALPH-CC.md coding-dev.yaml; do
-    ln -s "$REPO_DIR/$f" "$SANDBOX/$f"
-done
-
+# The sandbox mimics a user's project dir: only PROMPT.md + tasks.json.
+# Runners are invoked by absolute path from $REPO_DIR, exercising the
+# zero-copy invocation model that cc-headless and cc modes both use.
+ln -s "$REPO_DIR/shared/PROMPT.md" "$SANDBOX/PROMPT.md"
 cp "$REPO_DIR/tests/tasks.json" "$SANDBOX/tasks.json"
 
 cat <<EOF
 Sandbox ready: $SANDBOX
 
 Headless mode:
-  cd $SANDBOX && ./ralph.sh --max-iterations 3
+  cd $SANDBOX && $REPO_DIR/cc-headless/ralph.sh --max-iterations 3
 
 Claude Code mode:
   cd $SANDBOX && claude
-  then in the session: follow RALPH-CC.md, max-iterations 3
+  then in the session: follow $REPO_DIR/cc/RALPH-CC.md, max-iterations 3
 EOF

@@ -15,7 +15,16 @@ ITERATION="1"
 MAX_ITERATIONS=""
 LAST_BRANCH_FILE=".ralph-last-branch"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Resolve symlinks so SHARED_DIR is correct when the runner is symlinked
+# into $PATH. Walks a chain of relative or absolute symlinks.
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+    DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ $SOURCE != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+SHARED_DIR="$SCRIPT_DIR/../shared"
 
 usage() {
     cat <<'EOF' >&2
@@ -61,18 +70,18 @@ done
 # --- Validate ---
 if [[ ! -f "$PROMPT_FILE" ]]; then
     echo "Error: Prompt file '$PROMPT_FILE' not found." >&2
-    echo "Copy the template: cp $SCRIPT_DIR/PROMPT.md ." >&2
+    echo "Copy the template: cp $SHARED_DIR/PROMPT.md ." >&2
     exit 1
 fi
 
 if [[ ! -f "$TASK_FILE" ]]; then
     echo "Error: Task file '$TASK_FILE' not found." >&2
-    echo "Copy the example: cp $SCRIPT_DIR/tasks.json.example tasks.json" >&2
+    echo "Copy the example: cp $SHARED_DIR/tasks.json.example tasks.json" >&2
     exit 1
 fi
 
 # --- Load shared helpers ---
-source "$SCRIPT_DIR/ralph-lib.sh"
+source "$SHARED_DIR/ralph-lib.sh"
 
 # --- Read task file metadata ---
 BRANCH=$(read_task_meta "branch")

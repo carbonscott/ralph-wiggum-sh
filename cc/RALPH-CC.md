@@ -1,9 +1,9 @@
 # Ralph Loop — Claude Code Session Edition
 
-Drop-in alternative to `./ralph.sh --max-iterations N`, designed to run
-entirely inside a live Claude Code chat session using the `Agent()`
-subagent tool instead of headless `claude -p`. Use this when `-p` mode
-is unavailable or restricted.
+Drop-in alternative to `cc-headless/ralph.sh --max-iterations N`,
+designed to run entirely inside a live Claude Code chat session using
+the `Agent()` subagent tool instead of headless `claude -p`. Use this
+when `-p` mode is unavailable or restricted.
 
 Same `PROMPT.md`, same `tasks.json`, same `.lnb/` notebook, same
 `archive/` directory, same per-iteration semantics. The only thing that
@@ -13,9 +13,9 @@ changes is who spawns the per-iteration agent.
 
 In a Claude Code chat, type one of:
 
-> follow RALPH-CC.md, max-iterations 10
+> follow ~/codes/ralph-wiggum-lnb/cc/RALPH-CC.md, max-iterations 10
 
-> follow RALPH-CC.md, max-iterations 5, task-file tasks.json
+> follow ~/codes/ralph-wiggum-lnb/cc/RALPH-CC.md, max-iterations 5, task-file tasks.json
 
 Defaults when unspecified:
 
@@ -30,14 +30,14 @@ Defaults when unspecified:
    (or you must approve each subagent tool call manually). Subagents
    inherit the parent session's permission mode. This replaces
    `ralph.sh`'s `--permission-mode acceptEdits` flag.
-2. `ralph-prep.sh`, `ralph-lib.sh`, `PROMPT.md`, and `coding-dev.yaml`
-   must exist in the current directory. `tasks.json` must exist and
-   contain the stories to work through. (`coding-dev.yaml` is the
-   lab-notebook schema — without it, `ensure_notebook` falls back to
-   the default `research-notebook` schema and agents log with the
-   wrong type vocabulary.)
-3. `ralph-prep.sh` must be executable (`chmod +x ralph-prep.sh`).
-4. `jq` and `lab-notebook` must be on `$PATH` (same as for `ralph.sh`).
+2. `PROMPT.md` and `tasks.json` must exist in the current directory.
+   Copy them from the repo: `cp ~/codes/ralph-wiggum-lnb/shared/PROMPT.md .`
+   and `cp ~/codes/ralph-wiggum-lnb/shared/tasks.json.example tasks.json`,
+   then edit `tasks.json` to describe your stories. Nothing else needs
+   to live in the project dir — `ralph-prep.sh`, `ralph-lib.sh`, and
+   `coding-dev.yaml` all stay in the repo and are invoked/sourced by
+   absolute path.
+3. `jq` and `lab-notebook` must be on `$PATH` (same as for `ralph.sh`).
 
 ## Procedure for the main Claude Code session
 
@@ -68,14 +68,17 @@ For `i` in `1..max-iterations`:
 1. **Build the prompt.** Call:
 
    ```
-   Bash("./ralph-prep.sh --iteration i --max-iterations N --task-file <task-file>")
+   Bash("$HOME/codes/ralph-wiggum-lnb/cc/ralph-prep.sh --iteration i --max-iterations N --task-file <task-file>")
    ```
 
    Pass the same `N` you parsed in Setup so the start log entry records
    the cap alongside the iteration number (matches `ralph.sh`'s log
    format). Capture the tool result's stdout. This is the filled
    prompt. Do not read, quote, or summarize it — just hold it for the
-   next step.
+   next step. Use `$HOME/...` (not `~/...`) inside `Bash()` — the tilde
+   only expands when unquoted, so `$HOME` is safer if the path later
+   gets wrapped in quotes. If the repo lives somewhere other than
+   `$HOME/codes/ralph-wiggum-lnb`, substitute your checkout path.
 
 2. **Spawn the worker.** Call:
 
@@ -94,8 +97,8 @@ For `i` in `1..max-iterations`:
 3. **Check the return.** Inspect the subagent's final message. **Check
    `ALL_DONE` first — `<promise>ALL_DONE</promise>` contains
    `<promise>DONE</promise>` as a substring, so the order is
-   load-bearing.** (Same reason `ralph.sh`'s grep checks `ALL_DONE`
-   before `DONE` at ralph.sh:~159.)
+   load-bearing.** (Same reason `cc-headless/ralph.sh`'s grep checks
+   `ALL_DONE` before `DONE`.)
 
    - Contains `<promise>ALL_DONE</promise>`:
      - Call `Bash("LAB_NOTEBOOK_DIR=<notebook> lab-notebook emit --context <context> --type done --tags ralph-harness 'ralph-cc: all stories complete at iteration i'")`
@@ -147,7 +150,7 @@ the user doesn't need.
 
 | Aspect | `ralph.sh` | This flow |
 |---|---|---|
-| Entry | terminal: `./ralph.sh --max-iterations N` | chat: "follow RALPH-CC.md, max-iterations N" |
+| Entry | terminal: `~/codes/ralph-wiggum-lnb/cc-headless/ralph.sh --max-iterations N` | chat: "follow ~/codes/ralph-wiggum-lnb/cc/RALPH-CC.md, max-iterations N" |
 | Per-iter agent | `claude -p --permission-mode acceptEdits` | `Agent(subagent_type="general-purpose")` |
 | Permission mode | CLI flag | inherited from main session |
 | Intermediate display | stream-json via `format_stream` | native Claude Code subagent UI |
@@ -155,9 +158,10 @@ the user doesn't need.
 | Main-session context cost | 0 | ~50 tokens/iter |
 | State storage | same | same |
 
-## Relationship to `ralph-lib.sh`
+## Relationship to `shared/ralph-lib.sh`
 
-`ralph-prep.sh` sources `ralph-lib.sh` for the same helper functions
-that `ralph.sh` uses (`read_task_meta`, `archive_previous_run`,
-`ensure_notebook`, `log_to_notebook`, `query_recent_history`,
-`build_prompt`). A change to `ralph-lib.sh` affects both runners.
+`ralph-prep.sh` sources `../shared/ralph-lib.sh` for the same helper
+functions that `cc-headless/ralph.sh` uses (`read_task_meta`,
+`archive_previous_run`, `ensure_notebook`, `log_to_notebook`,
+`query_recent_history`, `build_prompt`). A change to
+`shared/ralph-lib.sh` affects both runners.
