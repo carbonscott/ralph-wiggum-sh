@@ -8,6 +8,34 @@ Based on the [Ralph Wiggum technique](https://ghuntley.com/ralph/) with
 structured notebook logging (queryable history, pattern discovery). See also
 [Effective Harnesses for Long-Running Agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents).
 
+## Install
+
+```bash
+git clone https://github.com/carbonscott/ralph-wiggum-lnb ~/codes/ralph-wiggum-lnb
+~/codes/ralph-wiggum-lnb/install.sh
+```
+
+Two install artifacts:
+
+- `~/.local/bin/ralph` → symlink to the headless runner. Put `~/.local/bin`
+  on `$PATH` if it isn't already (`install.sh` warns you if not).
+- `~/.claude/skills/ralph-lnb/SKILL.md` → the `/ralph-lnb` slash command
+  for Claude Code chats.
+
+After install, the invocations become:
+
+- **Headless**: `ralph --max-iterations 3`
+- **Claude Code chat**: `/ralph-lnb max-iterations 3` (restart any
+  running sessions — skills load at session start)
+
+`install.sh` is idempotent. Re-run it after moving or re-cloning the
+repo — it rewrites the skill with the new path. Override the bin
+location with `RALPH_BIN_DIR=/usr/local/bin ./install.sh`. Undo with
+`./uninstall.sh`.
+
+If you prefer not to install, the absolute-path invocations in the
+Quick Start below still work.
+
 ## Quick Start
 
 ```bash
