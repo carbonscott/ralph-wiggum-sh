@@ -10,10 +10,15 @@ Exercises both modes so you can verify `cc/RALPH-CC.md` and
 - `tasks.json` — 2-story fixture (create `hello.txt`, append a line)
 - `setup-sandbox.sh` — scaffolds a timestamped sandbox under `$TMPDIR`
 
+Prerequisite: run `../install.sh` once from the repo so `ralph` is on
+`$PATH` and `/ralph-lnb` is registered as a Claude Code skill. If you
+prefer not to install, the sandbox-setup script also prints
+absolute-path fallbacks you can use instead.
+
 ## Running in Claude Code (non-headless)
 
 1. From the repo root: `./tests/setup-sandbox.sh`. Note the sandbox
-   path and the `cc/RALPH-CC.md` absolute path it prints.
+   path it prints.
 2. Open a new session in the sandbox:
    ```
    cd /tmp/ralph-smoke-YYYYMMDD-HHMMSS && claude
@@ -22,8 +27,9 @@ Exercises both modes so you can verify `cc/RALPH-CC.md` and
    `/permissions`). Subagents inherit the main session's permission
    mode, so this replaces `cc-headless/ralph.sh`'s
    `--permission-mode acceptEdits` flag.
-4. In the session: `follow <REPO_DIR>/cc/RALPH-CC.md, max-iterations 3`
-   (the sandbox-setup script prints the exact line to use).
+4. In the session: `/ralph-lnb max-iterations 3` (the sandbox-setup
+   script prints the exact line to use, including the no-install
+   fallback if you haven't run `../install.sh` yet).
 5. Expected: Claude creates `hello.txt` with the two expected lines
    and reports `ALL_DONE` within 2 iterations.
 6. Verify:
@@ -36,12 +42,12 @@ Exercises both modes so you can verify `cc/RALPH-CC.md` and
 ## Running headless
 
 ```
-cd /tmp/ralph-smoke-YYYYMMDD-HHMMSS && <REPO_DIR>/cc-headless/ralph.sh --max-iterations 3
+cd /tmp/ralph-smoke-YYYYMMDD-HHMMSS && ralph --max-iterations 3
 ```
 
-The sandbox-setup script prints the exact command with `<REPO_DIR>`
-resolved. See `../cc/RALPH-CC.md` and `../cc-headless/ralph.sh --help`
-for details on each mode.
+The sandbox-setup script prints the exact command (assuming you've
+run `../install.sh` from the repo once). See `../cc/RALPH-CC.md` and
+`../cc-headless/ralph.sh --help` for details on each mode.
 
 ## Cleanup
 
