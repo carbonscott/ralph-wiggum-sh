@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 680">
+  <defs>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#8B8578"/>
+    </marker>
+    <marker id="arr-loop" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#B5AD9E"/>
+    </marker>
+    <marker id="arr-conn" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+      <polygon points="0 0, 7 2.5, 0 5" fill="#C4B9A8"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1500" height="680" fill="#F5F0EB"/>
+
+  <!-- Title -->
+  <text x="750" y="42" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="26" font-weight="bold" fill="#2D2A26">The Ralph-LNB Loop</text>
+  <text x="750" y="68" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#8B8578">one story per iteration · fresh agent each time · notebook carries context forward</text>
+
+  <!-- Loop-back arrow from Signal to Recall -->
+  <path d="M 1191 120 C 1191 72, 311 72, 311 120"
+        fill="none" stroke="#B5AD9E" stroke-width="1.8" stroke-dasharray="7,4"
+        marker-end="url(#arr-loop)"/>
+  <text x="751" y="82" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#A09880" font-style="italic">next iteration (if not all done)</text>
+
+  <!-- ===== Card 1: Recall ===== -->
+  <rect x="218" y="125" width="185" height="225" rx="12" fill="#FAFAF7" stroke="#D5CFC6" stroke-width="1.5"/>
+  <text x="311" y="160" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="bold" fill="#2D2A26">Recall</text>
+  <rect x="251" y="180" width="120" height="11" rx="3" fill="#B5AD9E"/>
+  <rect x="251" y="199" width="90" height="11" rx="3" fill="#C4B9A8"/>
+  <rect x="251" y="218" width="105" height="11" rx="3" fill="#B5AD9E" opacity="0.7"/>
+  <text x="311" y="278" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#8B8578">query notebook</text>
+  <text x="311" y="296" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#8B8578">for recent history</text>
+  <text x="311" y="332" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#A09880">10 latest entries</text>
+
+  <!-- Arrow 1 → 2 -->
+  <line x1="403" y1="237" x2="432" y2="237" stroke="#8B8578" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- ===== Card 2: Build ===== -->
+  <rect x="438" y="125" width="185" height="225" rx="12" fill="#FAFAF7" stroke="#D5CFC6" stroke-width="1.5"/>
+  <text x="531" y="160" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="bold" fill="#2D2A26">Build</text>
+  <rect x="471" y="180" width="120" height="11" rx="3" fill="#C4B9A8"/>
+  <rect x="471" y="199" width="120" height="11" rx="3" fill="#A89E8C"/>
+  <rect x="471" y="218" width="80" height="11" rx="3" fill="#7B8B65"/>
+  <text x="531" y="278" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#8B8578">fill PROMPT.md</text>
+  <text x="531" y="296" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#8B8578">with tasks + history</text>
+  <text x="531" y="332" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#A09880">template markers</text>
+
+  <!-- Arrow 2 → 3 -->
+  <line x1="623" y1="237" x2="652" y2="237" stroke="#8B8578" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- ===== Card 3: Spawn ===== -->
+  <rect x="658" y="125" width="185" height="225" rx="12" fill="#FAFAF7" stroke="#D5CFC6" stroke-width="1.5"/>
+  <text x="751" y="160" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="bold" fill="#2D2A26">Spawn</text>
+  <rect x="706" y="185" width="90" height="40" rx="6" fill="#7B8B65" opacity="0.85"/>
+  <text x="751" y="278" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#8B8578">fresh Claude agent</text>
+  <text x="751" y="296" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#8B8578">per iteration</text>
+  <text x="751" y="332" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#A09880">clean context</text>
+
+  <!-- Arrow 3 → 4 -->
+  <line x1="843" y1="237" x2="872" y2="237" stroke="#8B8578" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- ===== Card 4: Work ===== -->
+  <rect x="878" y="125" width="185" height="225" rx="12" fill="#FAFAF7" stroke="#D5CFC6" stroke-width="1.5"/>
+  <text x="971" y="160" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="bold" fill="#2D2A26">Work</text>
+  <rect x="911" y="180" width="55" height="10" rx="3" fill="#B5AD9E"/>
+  <rect x="911" y="198" width="95" height="10" rx="3" fill="#A89E8C"/>
+  <rect x="911" y="216" width="70" height="10" rx="3" fill="#7B8B65"/>
+  <text x="971" y="278" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#8B8578">implement one story</text>
+  <text x="971" y="296" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#8B8578">commit + update tasks</text>
+  <text x="971" y="332" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#A09880">orient → execute</text>
+
+  <!-- Arrow 4 → 5 -->
+  <line x1="1063" y1="237" x2="1092" y2="237" stroke="#8B8578" stroke-width="1.8" marker-end="url(#arr)"/>
+
+  <!-- ===== Card 5: Signal ===== -->
+  <rect x="1098" y="125" width="185" height="225" rx="12" fill="#FAFAF7" stroke="#D5CFC6" stroke-width="1.5"/>
+  <text x="1191" y="160" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="bold" fill="#2D2A26">Signal</text>
+  <rect x="1141" y="185" width="100" height="18" rx="5" fill="#7B8B65" opacity="0.8"/>
+  <text x="1191" y="198" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="bold" fill="#FAFAF7">DONE</text>
+  <rect x="1141" y="211" width="100" height="18" rx="5" fill="#C4785A" opacity="0.8"/>
+  <text x="1191" y="224" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="10" font-weight="bold" fill="#FAFAF7">ALL_DONE</text>
+  <text x="1191" y="278" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#8B8578">emit promise tag</text>
+  <text x="1191" y="296" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#8B8578">DONE or ALL_DONE</text>
+  <text x="1191" y="332" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="11" fill="#A09880">loop or stop</text>
+
+  <!-- ===== SECTION DIVIDER ===== -->
+  <line x1="218" y1="385" x2="1283" y2="385" stroke="#D5CFC6" stroke-width="1"/>
+
+  <!-- ===== CONNECTION LINES (storage ↔ phases) ===== -->
+  <!-- Notebook → Recall (history feeds recall) -->
+  <line x1="350" y1="415" x2="311" y2="355" stroke="#C4B9A8" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-conn)"/>
+  <!-- Work → Notebook (agent logs entries) -->
+  <line x1="940" y1="355" x2="620" y2="415" stroke="#C4B9A8" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-conn)"/>
+  <!-- Work → tasks.json (agent updates passes) -->
+  <line x1="990" y1="355" x2="975" y2="415" stroke="#C4B9A8" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-conn)"/>
+
+  <!-- ===== Storage 1: .lnb/ Notebook ===== -->
+  <rect x="218" y="420" width="490" height="115" rx="12" fill="#FAFAF7" stroke="#D5CFC6" stroke-width="1.5"/>
+  <text x="463" y="450" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="bold" fill="#2D2A26">.lnb/ Notebook</text>
+  <text x="463" y="470" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#8B8578">append-only log · cross-iteration memory</text>
+  <!-- Entry type pills -->
+  <rect x="278" y="487" width="50" height="16" rx="4" fill="#B5AD9E"/>
+  <text x="303" y="499" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="bold" fill="#FAFAF7">start</text>
+  <rect x="336" y="487" width="45" height="16" rx="4" fill="#A89E8C"/>
+  <text x="358" y="499" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="bold" fill="#FAFAF7">plan</text>
+  <rect x="389" y="487" width="45" height="16" rx="4" fill="#7B8B65"/>
+  <text x="411" y="499" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="bold" fill="#FAFAF7">impl</text>
+  <rect x="442" y="487" width="48" height="16" rx="4" fill="#7B8B65" opacity="0.7"/>
+  <text x="466" y="499" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="bold" fill="#FAFAF7">done</text>
+  <rect x="498" y="487" width="58" height="16" rx="4" fill="#C4785A" opacity="0.7"/>
+  <text x="527" y="499" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="bold" fill="#FAFAF7">pattern</text>
+  <rect x="564" y="487" width="68" height="16" rx="4" fill="#C4785A" opacity="0.5"/>
+  <text x="598" y="499" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="bold" fill="#FAFAF7">dead-end</text>
+  <text x="463" y="524" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#A09880">read by Recall · written by Work</text>
+
+  <!-- ===== Storage 2: tasks.json ===== -->
+  <rect x="748" y="420" width="535" height="115" rx="12" fill="#FAFAF7" stroke="#D5CFC6" stroke-width="1.5"/>
+  <text x="1015" y="450" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="16" font-weight="bold" fill="#2D2A26">tasks.json</text>
+  <text x="1015" y="470" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="12" fill="#8B8578">story queue · one story completed per iteration</text>
+  <!-- Progress bars -->
+  <rect x="828" y="490" width="70" height="10" rx="3" fill="#7B8B65"/>
+  <rect x="906" y="490" width="70" height="10" rx="3" fill="#7B8B65"/>
+  <rect x="984" y="490" width="70" height="10" rx="3" fill="#D5CFC6"/>
+  <rect x="1062" y="490" width="70" height="10" rx="3" fill="#D5CFC6" stroke="#C4785A" stroke-width="1" stroke-dasharray="3,2"/>
+  <rect x="1140" y="490" width="70" height="10" rx="3" fill="#D5CFC6" stroke="#C4785A" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="863" y="514" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="9" fill="#7B8B65">pass</text>
+  <text x="941" y="514" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="9" fill="#7B8B65">pass</text>
+  <text x="1019" y="514" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="9" fill="#A09880">todo</text>
+  <text x="1097" y="514" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="9" fill="#A09880">todo</text>
+  <text x="1175" y="514" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="9" fill="#A09880">todo</text>
+  <text x="1015" y="524" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#A09880">read by Build · updated by Work</text>
+
+  <!-- ===== BOTTOM SECTION ===== -->
+  <line x1="218" y1="570" x2="1283" y2="570" stroke="#D5CFC6" stroke-width="1"/>
+  <text x="218" y="595" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#A09880">stateless per iteration</text>
+  <text x="1283" y="595" text-anchor="end" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#A09880">stateful across iterations</text>
+  <text x="750" y="640" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#8B8578">fresh context + persistent memory = reliable autonomous development</text>
+</svg>
