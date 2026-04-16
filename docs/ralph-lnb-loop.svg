@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 680">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 600">
   <defs>
     <marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
       <polygon points="0 0, 8 3, 0 6" fill="#8B8578"/>
@@ -6,13 +6,13 @@
     <marker id="arr-loop" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
       <polygon points="0 0, 10 3.5, 0 7" fill="#B5AD9E"/>
     </marker>
-    <marker id="arr-conn" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <marker id="arr-conn" markerWidth="7" markerHeight="5" refX="7" refY="2.5" orient="auto-start-reverse">
       <polygon points="0 0, 7 2.5, 0 5" fill="#C4B9A8"/>
     </marker>
   </defs>
 
   <!-- Background -->
-  <rect width="1500" height="680" fill="#F5F0EB"/>
+  <rect width="1500" height="600" fill="#F5F0EB"/>
 
   <!-- Title -->
   <text x="750" y="42" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="26" font-weight="bold" fill="#2D2A26">The Ralph-LNB Loop</text>
@@ -91,8 +91,8 @@
   <!-- ===== CONNECTION LINES (storage ↔ phases) ===== -->
   <!-- Notebook → Recall (history feeds recall) -->
   <line x1="350" y1="415" x2="311" y2="355" stroke="#C4B9A8" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-conn)"/>
-  <!-- Work → Notebook (agent logs entries) -->
-  <line x1="940" y1="355" x2="620" y2="415" stroke="#C4B9A8" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-conn)"/>
+  <!-- Work ↔ Notebook (agent queries + logs entries) -->
+  <line x1="940" y1="355" x2="620" y2="415" stroke="#C4B9A8" stroke-width="1.5" stroke-dasharray="5,3" marker-start="url(#arr-conn)" marker-end="url(#arr-conn)"/>
   <!-- Work → tasks.json (agent updates passes) -->
   <line x1="990" y1="355" x2="975" y2="415" stroke="#C4B9A8" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arr-conn)"/>
 
@@ -113,7 +113,7 @@
   <text x="527" y="499" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="bold" fill="#FAFAF7">pattern</text>
   <rect x="564" y="487" width="68" height="16" rx="4" fill="#C4785A" opacity="0.5"/>
   <text x="598" y="499" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="bold" fill="#FAFAF7">dead-end</text>
-  <text x="463" y="524" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#A09880">read by Recall · written by Work</text>
+  <text x="463" y="524" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#A09880">seeded by Recall · queried + written by Work</text>
 
   <!-- ===== Storage 2: tasks.json ===== -->
   <rect x="748" y="420" width="535" height="115" rx="12" fill="#FAFAF7" stroke="#D5CFC6" stroke-width="1.5"/>
@@ -132,9 +132,6 @@
   <text x="1175" y="514" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="9" fill="#A09880">todo</text>
   <text x="1015" y="524" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#A09880">read by Build · updated by Work</text>
 
-  <!-- ===== BOTTOM SECTION ===== -->
-  <line x1="218" y1="570" x2="1283" y2="570" stroke="#D5CFC6" stroke-width="1"/>
-  <text x="218" y="595" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#A09880">stateless per iteration</text>
-  <text x="1283" y="595" text-anchor="end" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#A09880">stateful across iterations</text>
-  <text x="750" y="640" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#8B8578">fresh context + persistent memory = reliable autonomous development</text>
+  <!-- ===== TAGLINE ===== -->
+  <text x="750" y="575" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#8B8578">fresh context window + on-disk memory = reliable autonomous development</text>
 </svg>
