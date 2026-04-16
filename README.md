@@ -1,4 +1,4 @@
-# Ralph Wiggum
+# Ralph-Wiggum-LNB
 
 ![The Ralph-LNB Loop](docs/ralph-lnb-loop.svg)
 
