@@ -113,7 +113,7 @@
   <text x="527" y="499" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="bold" fill="#FAFAF7">pattern</text>
   <rect x="564" y="487" width="68" height="16" rx="4" fill="#C4785A" opacity="0.5"/>
   <text x="598" y="499" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="9" font-weight="bold" fill="#FAFAF7">dead-end</text>
-  <text x="463" y="524" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#A09880">read by Recall · written by Work</text>
+  <text x="463" y="524" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-size="10" fill="#A09880">read by Recall · queried+written by Work</text>
 
   <!-- ===== Storage 2: tasks.json ===== -->
   <rect x="748" y="420" width="535" height="115" rx="12" fill="#FAFAF7" stroke="#D5CFC6" stroke-width="1.5"/>
