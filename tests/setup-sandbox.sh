@@ -21,8 +21,7 @@ Claude Code mode:
   cd $SANDBOX && claude
   then in the session: /ralph-lnb max-iterations 3
 
-Not installed yet? Run $REPO_DIR/install.sh first, or use the
-absolute-path fallback:
+Not installed yet? Run $REPO_DIR/install.sh first. For headless-only
+use without install, the script can be invoked by absolute path:
   $REPO_DIR/cc-headless/ralph.sh --max-iterations 3
-  follow $REPO_DIR/cc/RALPH-CC.md, max-iterations 3
 EOF

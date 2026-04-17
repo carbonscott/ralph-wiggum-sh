@@ -30,9 +30,8 @@ Usage: install.sh [--force]
 
 Installs ralph-wiggum-lnb entry points. Run from a fresh git clone:
 
-    export RALPH_REPO=~/codes/ralph-wiggum-lnb   # or wherever you want it
-    git clone <url> "$RALPH_REPO"
-    "$RALPH_REPO/install.sh"
+    git clone <url> ~/codes/ralph-wiggum-lnb
+    ~/codes/ralph-wiggum-lnb/install.sh
 
 Environment variables:
   RALPH_BIN_DIR   Where to put the `ralph` symlink. Default: ~/.local/bin
@@ -138,10 +137,6 @@ cat <<EOF
 Done. Quick usage:
   ralph --max-iterations 3                 # headless mode
   /ralph-lnb max-iterations 3              # in a Claude Code chat
-
-Tip: if you plan to use RALPH-CC.md or the uninstalled fallback, add
-  export RALPH_REPO="$REPO"
-to your ~/.zshrc or ~/.bashrc.
 
 EOF
 

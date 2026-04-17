@@ -30,17 +30,9 @@ Verify with `lab-notebook --help`. Update later with
 ## Install
 
 ```bash
-# Pick any path; snippets below reference $RALPH_REPO so they copy-paste verbatim.
-export RALPH_REPO=~/codes/ralph-wiggum-lnb
-
-git clone https://github.com/carbonscott/ralph-wiggum-lnb "$RALPH_REPO"
-"$RALPH_REPO/install.sh"
+git clone https://github.com/carbonscott/ralph-wiggum-lnb ~/codes/ralph-wiggum-lnb
+~/codes/ralph-wiggum-lnb/install.sh
 ```
-
-Add the `export` line to your `~/.zshrc` or `~/.bashrc` if you want it
-to persist across new terminals. The installed `ralph` binary and
-`/ralph-lnb` skill don't need it — only snippets in this README and
-`cc/RALPH-CC.md` do.
 
 Two install artifacts:
 
@@ -62,15 +54,16 @@ location with `RALPH_BIN_DIR=/usr/local/bin ./install.sh`. Undo with
 `./uninstall.sh` — if you overrode `RALPH_BIN_DIR` on install, pass
 the same value on uninstall so it can find the symlink to remove.
 
-If you prefer not to install, you can still run the scripts by
-absolute path: `$RALPH_REPO/cc-headless/ralph.sh` for headless mode,
-or `follow $RALPH_REPO/cc/RALPH-CC.md` in a Claude Code session.
+For headless-only use without install, you can invoke the script by
+absolute path: `~/codes/ralph-wiggum-lnb/cc-headless/ralph.sh`. The
+chat runner (`/ralph-lnb`) requires `install.sh` — it renders the
+skill with concrete paths baked in.
 
 ## Quick Start
 
 ```bash
 # In your project directory:
-cp "$RALPH_REPO/shared/tasks.json.example" tasks.json
+cp ~/codes/ralph-wiggum-lnb/shared/tasks.json.example tasks.json
 # Edit tasks.json with your stories
 ```
 
@@ -132,22 +125,34 @@ tasks.json (what to do)  +  .lnb/ (what happened)  +  PROMPT.md (how to do it)
 Ralph ships two entry points that share the same `PROMPT.md`, `tasks.json`,
 `.lnb/`, and `archive/` state:
 
-- **`cc-headless/ralph.sh`** — the original. Runs in a terminal, spawns
-  a fresh `claude -p` per iteration. Truly stateless outer loop.
-- **`cc/RALPH-CC.md`** — drop-in alternative that runs inside a live
-  Claude Code chat session and uses the `Agent()` subagent tool. Use
-  when `-p` mode is unavailable or restricted. See `cc/RALPH-CC.md` for
-  the full invocation recipe and stop-condition semantics.
+- **`ralph`** (headless, terminal) — runs in a terminal and spawns a
+  fresh `claude -p` per iteration. Truly stateless outer loop. Backed
+  by `cc-headless/ralph.sh`.
+- **`/ralph-lnb`** (chat, Claude Code session) — runs inside a live
+  Claude Code chat session and uses the `Agent()` subagent tool
+  instead of `-p`. Use when `-p` mode is unavailable or restricted.
+  Backed by the skill rendered from `skill/SKILL.md.template`.
 
 Both modes complete one story per iteration, emit `<promise>DONE</promise>`
 or `<promise>ALL_DONE</promise>`, and keep state in the same places.
 
+| Aspect | `ralph` (headless) | `/ralph-lnb` (chat) |
+|---|---|---|
+| Entry | terminal: `ralph --max-iterations N` | chat: `/ralph-lnb max-iterations N` |
+| Per-iter agent | `claude -p --permission-mode acceptEdits` | `Agent(subagent_type="general-purpose")` |
+| Permission mode | CLI flag | inherited from main session |
+| Intermediate display | stream-json via `format_stream` | native Claude Code subagent UI |
+| Stop on no marker | no (only stops on non-zero exit code) | yes |
+| Main-session context cost | 0 | ~50 tokens/iter |
+| State storage | same | same |
+
 ## Layout
 
-The repo splits into three directories so the mode boundary is obvious:
+The repo splits into four directories so the mode boundary is obvious:
 
 - `cc-headless/` — files specific to the headless `claude -p` runner
-- `cc/` — files specific to the in-session Claude Code runner
+- `cc/` — prompt builder invoked by the `/ralph-lnb` skill
+- `skill/` — skill template rendered into `~/.claude/skills/ralph-lnb/SKILL.md` by `install.sh`
 - `shared/` — prompt template, shared bash helpers, notebook schema, and
   task file example used by both runners
 
@@ -156,8 +161,8 @@ The repo splits into three directories so the mode boundary is obvious:
 | File | Purpose |
 |------|---------|
 | `cc-headless/ralph.sh` | Headless runner — uses `claude -p` |
-| `cc/RALPH-CC.md` | Driver doc for the Claude Code session runner |
-| `cc/ralph-prep.sh` | Per-iteration bookkeeping + prompt builder; stdout is the filled prompt |
+| `cc/ralph-prep.sh` | Per-iteration bookkeeping + prompt builder invoked by the `/ralph-lnb` skill; stdout is the filled prompt |
+| `skill/SKILL.md.template` | Skill template — `install.sh` renders this into `~/.claude/skills/ralph-lnb/SKILL.md` with absolute paths |
 | `shared/ralph-lib.sh` | Shared bash helpers sourced by both runners |
 | `shared/PROMPT.md` | Prompt template with `<!-- FILL:xxx -->` markers |
 | `shared/tasks.json.example` | Starter task file (copy to your project as `tasks.json`) |
@@ -229,8 +234,9 @@ LAB_NOTEBOOK_DIR=.lnb lab-notebook sql \
 
 For the Claude Code session runner, invoke it as `/ralph-lnb
 max-iterations N` (with `task-file` and other parameters passed
-inline). See `cc/RALPH-CC.md` for the underlying driver doc and
-stop-condition semantics.
+inline). See the rendered `~/.claude/skills/ralph-lnb/SKILL.md` for
+the driver doc and stop-condition semantics (or `skill/SKILL.md.template`
+in this repo for the pre-substitution source).
 
 ## Archive
 

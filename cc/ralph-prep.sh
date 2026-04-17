@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Per-iteration bookkeeping + prompt builder for RALPH-CC.md.
+# Per-iteration bookkeeping + prompt builder for the /ralph-lnb skill.
 # Prints the filled prompt to stdout so a Claude Code session can capture
 # it and pass it to Agent(). Diagnostics go to stderr.
 
@@ -33,7 +33,7 @@ Usage: ralph-prep.sh [OPTIONS]
 Runs one iteration of ralph bookkeeping (archive, notebook init, history
 query, prompt fill) and prints the filled PROMPT.md to stdout. Intended
 to be invoked by a Claude Code session that then passes the stdout to
-the Agent() tool — see RALPH-CC.md.
+the Agent() tool — see the /ralph-lnb skill (skill/SKILL.md.template).
 
 Options:
   --prompt FILE           Custom prompt template (default: repo's shared/PROMPT.md)
@@ -46,7 +46,7 @@ Options:
   --max-iterations N      Iteration cap, recorded alongside --iteration
                           in the start log entry (optional). Does not
                           affect the loop — the Claude Code session
-                          enforces the cap via RALPH-CC.md.
+                          enforces the cap via the /ralph-lnb skill.
   -h, --help              Show this help
 EOF
     exit 0
@@ -108,12 +108,15 @@ fi
 archive_previous_run
 ensure_notebook
 
-if [[ -n "$MAX_ITERATIONS" ]]; then
-    log_to_notebook "start" "ralph-cc: starting iteration $ITERATION/$MAX_ITERATIONS"
-else
-    log_to_notebook "start" "ralph-cc: starting iteration $ITERATION"
-fi
-
 # --- Emit filled prompt to stdout ---
+# Query history BEFORE logging "start" so the recent_history block sees
+# only prior iterations' entries — matches cc-headless/ralph.sh ordering
+# (see ralph.sh:150-154) so both runners build byte-identical prompts.
 history=$(query_recent_history)
 build_prompt "$history"
+
+if [[ -n "$MAX_ITERATIONS" ]]; then
+    log_to_notebook "start" "ralph-lnb: starting iteration $ITERATION/$MAX_ITERATIONS"
+else
+    log_to_notebook "start" "ralph-lnb: starting iteration $ITERATION"
+fi

@@ -1,7 +1,7 @@
 # Smoke tests
 
 Smoke test for the ralph loop against a throwaway 2-story fixture.
-Exercises both modes so you can verify `cc/RALPH-CC.md` and
+Exercises both modes so you can verify the `/ralph-lnb` skill and
 `cc-headless/ralph.sh` still work end-to-end after editing
 `shared/ralph-lib.sh`, `shared/PROMPT.md`, etc.
 
@@ -46,8 +46,8 @@ cd /tmp/ralph-smoke-YYYYMMDD-HHMMSS && ralph --max-iterations 3
 ```
 
 The sandbox-setup script prints the exact command (assuming you've
-run `../install.sh` from the repo once). See `../cc/RALPH-CC.md` and
-`../cc-headless/ralph.sh --help` for details on each mode.
+run `../install.sh` from the repo once). See `../skill/SKILL.md.template`
+and `../cc-headless/ralph.sh --help` for details on each mode.
 
 ## Cleanup
 
