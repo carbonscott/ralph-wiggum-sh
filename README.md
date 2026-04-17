@@ -234,8 +234,9 @@ LAB_NOTEBOOK_DIR=.lnb lab-notebook sql \
 
 For the Claude Code session runner, invoke it as `/ralph-lnb
 max-iterations N` (with `task-file` and other parameters passed
-inline). See `skill/SKILL.md.template` for the underlying driver doc
-and stop-condition semantics.
+inline). See the rendered `~/.claude/skills/ralph-lnb/SKILL.md` for
+the driver doc and stop-condition semantics (or `skill/SKILL.md.template`
+in this repo for the pre-substitution source).
 
 ## Archive
 

@@ -111,7 +111,7 @@ ensure_notebook
 # --- Emit filled prompt to stdout ---
 # Query history BEFORE logging "start" so the recent_history block sees
 # only prior iterations' entries — matches cc-headless/ralph.sh ordering
-# (see ralph.sh:151-154) so both runners build byte-identical prompts.
+# (see ralph.sh:150-154) so both runners build byte-identical prompts.
 history=$(query_recent_history)
 build_prompt "$history"
 
