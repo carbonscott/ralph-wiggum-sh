@@ -63,7 +63,7 @@ location with `RALPH_BIN_DIR=/usr/local/bin ./install.sh`. Undo with
 the same value on uninstall so it can find the symlink to remove.
 
 If you prefer not to install, you can still run the scripts by
-absolute path: `"$RALPH_REPO/cc-headless/ralph.sh"` for headless mode,
+absolute path: `$RALPH_REPO/cc-headless/ralph.sh` for headless mode,
 or `follow $RALPH_REPO/cc/RALPH-CC.md` in a Claude Code session.
 
 ## Quick Start

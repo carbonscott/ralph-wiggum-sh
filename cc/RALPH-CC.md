@@ -56,11 +56,18 @@ minimum specified.
 
 ### Setup
 
-1. Parse `max-iterations`, `task-file`, and `prompt` from the user's
+1. Verify `RALPH_REPO` is exported. Call:
+
+   ```
+   Bash("test -n \"$RALPH_REPO\" || { echo 'RALPH_REPO is not exported; see Prereq item 1' >&2; exit 1; }")
+   ```
+
+   If this fails, stop and report the error to the user. Do not continue.
+2. Parse `max-iterations`, `task-file`, and `prompt` from the user's
    message. Apply defaults for anything unspecified. `prompt` is
    optional — if the user did not supply it, leave it unset and omit
    `--prompt` from the `ralph-prep.sh` call in Loop step 1.
-2. Derive the notebook context once, so every subsequent log call uses
+3. Derive the notebook context once, so every subsequent log call uses
    the same value:
 
    ```
@@ -69,7 +76,7 @@ minimum specified.
 
    Capture stdout into `<context>`. This mirrors how `ralph-prep.sh`
    derives it, so both runners agree on the context slug.
-3. Announce once: `"Starting ralph loop, max-iterations=N, task-file=X, prompt=P, context=<context>"`.
+4. Announce once: `"Starting ralph loop, max-iterations=N, task-file=X, prompt=P, context=<context>"`.
    One line, nothing more. Use the user-supplied prompt path for `P`
    if they passed one; otherwise use the literal string
    `shared/PROMPT.md` so readers can tell at a glance which template
@@ -86,7 +93,7 @@ For `i` in `1..max-iterations`:
    ```
 
    Append `--prompt <prompt>` only if the user supplied one in Setup
-   step 1; otherwise omit the flag so `ralph-prep.sh` uses its own
+   step 2; otherwise omit the flag so `ralph-prep.sh` uses its own
    default (`shared/PROMPT.md`).
 
    Pass the same `N` you parsed in Setup so the start log entry records
@@ -119,7 +126,7 @@ For `i` in `1..max-iterations`:
 
    - Contains `<promise>ALL_DONE</promise>`:
      - Call `Bash("LAB_NOTEBOOK_DIR=<notebook> lab-notebook emit --context <context> --type done --tags ralph-harness 'ralph-cc: all stories complete at iteration i'")`
-       using the `<context>` derived in Setup step 2.
+       using the `<context>` derived in Setup step 3.
      - Break the loop. Go to "Post-loop".
    - Contains `<promise>DONE</promise>`:
      - Say exactly: `"iteration i: DONE, continuing"`. One line.
@@ -132,7 +139,7 @@ For `i` in `1..max-iterations`:
 ### Post-loop
 
 1. If the loop ended on `ALL_DONE`, optionally query the notebook for a
-   summary, using the `<context>` derived in Setup step 2:
+   summary, using the `<context>` derived in Setup step 3:
 
    ```
    Bash("LAB_NOTEBOOK_DIR=<notebook> lab-notebook sql \"SELECT ts, type, issue, substr(content,1,200) FROM entries WHERE context='<context>' AND type IN ('start','done','impl','blocker') ORDER BY ts\"")
