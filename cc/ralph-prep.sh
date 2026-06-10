@@ -2,8 +2,10 @@
 set -euo pipefail
 
 # Per-iteration bookkeeping + prompt builder for the /ralph-lnb skill.
-# Prints the filled prompt to stdout so a Claude Code session can capture
-# it and pass it to Agent(). Diagnostics go to stderr.
+# Writes the filled prompt to RALPH-PROMPT.md in the project dir and prints
+# only a one-line status to stdout, so the Claude Code session can point a
+# subagent at the file without holding the prompt in its own context.
+# Diagnostics go to stderr.
 
 # --- Defaults ---
 PROMPT_FILE=""
@@ -31,9 +33,10 @@ usage() {
 Usage: ralph-prep.sh [OPTIONS]
 
 Runs one iteration of ralph bookkeeping (archive, notebook init, history
-query, prompt fill) and prints the filled PROMPT.md to stdout. Intended
-to be invoked by a Claude Code session that then passes the stdout to
-the Agent() tool — see the /ralph-lnb skill (skill/SKILL.md.template).
+query, prompt fill) and writes the filled prompt to RALPH-PROMPT.md in the
+project dir, printing only a one-line status to stdout. Intended to be
+invoked by a Claude Code session that then points a subagent at that file
+via the Agent() tool — see the /ralph-lnb skill (skill/SKILL.md.template).
 
 Options:
   --prompt FILE           Custom prompt template (default: repo's shared/PROMPT.md)
@@ -108,15 +111,23 @@ fi
 archive_previous_run
 ensure_notebook
 
-# --- Emit filled prompt to stdout ---
+# --- Write filled prompt to RALPH-PROMPT.md ---
 # Query history BEFORE logging "start" so the recent_history block sees
 # only prior iterations' entries — matches cc-headless/ralph.sh ordering
 # (see ralph.sh:150-154) so both runners build byte-identical prompts.
 history=$(query_recent_history)
-build_prompt "$history"
 
+# Write the filled prompt to a file in the project dir (parent of the
+# notebook dir) instead of stdout, so the /ralph-lnb main agent never has
+# to hold the full prompt in its context. The subagent reads this file.
+# With the default NOTEBOOK_DIR=.lnb, dirname resolves to "." (project dir).
+PROMPT_OUT="$(dirname "$NOTEBOOK_DIR")/RALPH-PROMPT.md"
+build_prompt "$history" > "$PROMPT_OUT"
+echo "Wrote iteration $ITERATION prompt to $PROMPT_OUT"
+
+# Route the emit confirmation to stderr so stdout stays a single status line.
 if [[ -n "$MAX_ITERATIONS" ]]; then
-    log_to_notebook "start" "ralph-lnb: starting iteration $ITERATION/$MAX_ITERATIONS"
+    log_to_notebook "start" "ralph-lnb: starting iteration $ITERATION/$MAX_ITERATIONS" >&2
 else
-    log_to_notebook "start" "ralph-lnb: starting iteration $ITERATION"
+    log_to_notebook "start" "ralph-lnb: starting iteration $ITERATION" >&2
 fi

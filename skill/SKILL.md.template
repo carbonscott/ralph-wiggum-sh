@@ -74,15 +74,15 @@ For `i` in `1..max-iterations`:
 
    Append `--prompt <prompt>` only if the user supplied one in Setup step 1; otherwise omit the flag so `ralph-prep.sh` uses its own default (`shared/PROMPT.md`).
 
-   Pass the same `N` you parsed in Setup so the start log entry records the cap alongside the iteration number (matches `cc-headless/ralph.sh`'s log format). Capture the tool result's stdout. This is the filled prompt. Do not read, quote, or summarize it — just hold it for the next step.
+   Pass the same `N` you parsed in Setup so the start log entry records the cap alongside the iteration number (matches `cc-headless/ralph.sh`'s log format). `ralph-prep.sh` writes the filled prompt to `RALPH-PROMPT.md` in the project directory (the cwd) and prints only a one-line status to stdout — it does **not** print the prompt. Do not capture or hold the prompt; it never enters your context. Just confirm the Bash call succeeded.
 
-2. **Spawn the worker.** Call:
+2. **Spawn the worker.** Call (the prompt is a fixed string — the subagent reads the real instructions from the file):
 
    ```
    Agent(
        subagent_type="general-purpose",
        description="ralph iteration i",
-       prompt=<stdout from step 1>
+       prompt="Read ./RALPH-PROMPT.md in the current working directory and follow its instructions exactly. If that file is missing or empty, stop and report it instead of proceeding."
    )
    ```
 
@@ -122,10 +122,10 @@ For `i` in `1..max-iterations`:
 
 ## Context budgeting
 
-Each iteration adds ~50 tokens (the subagent's final narration plus the promise marker) to the main session's context. A 20-iteration run is roughly 1k tokens — acceptable. Keep your own between-iteration narration to one short line (`"iteration i: DONE, continuing"`). Do not summarize subagent output, do not re-read `tasks.json` yourself (`ralph-prep.sh` already does it every iteration), do not print anything the user doesn't need.
+The filled prompt (notebook context + full `tasks.json` + recent history) never enters the main session's context: `ralph-prep.sh` writes it to `RALPH-PROMPT.md` and the subagent reads it directly. Each iteration adds only the prep status line plus the subagent's final narration and promise marker — on the order of tens of tokens. Keep your own between-iteration narration to one short line (`"iteration i: DONE, continuing"`). Do not read `RALPH-PROMPT.md` yourself, do not summarize subagent output, do not re-read `tasks.json` yourself (`ralph-prep.sh` already folds it into the prompt file every iteration), do not print anything the user doesn't need.
 
 ## Relationship to the headless runner
 
-The headless runner `@@RALPH_REPO@@/cc-headless/ralph.sh` uses the same `ralph-prep.sh`, `shared/ralph-lib.sh`, `shared/PROMPT.md`, `tasks.json`, and `.lnb/` state. A change to `shared/ralph-lib.sh` affects both runners. The only difference is who spawns the per-iteration agent: `claude -p` in headless, `Agent()` in this skill.
+The headless runner `@@RALPH_REPO@@/cc-headless/ralph.sh` shares `shared/ralph-lib.sh`, `shared/PROMPT.md`, `tasks.json`, and `.lnb/` state with this skill. A change to `shared/ralph-lib.sh` (e.g. `build_prompt`) affects both runners. `ralph-prep.sh` is used only by this skill — headless calls `build_prompt` directly and pipes the prompt to `claude -p`, whereas this skill has `ralph-prep.sh` write the prompt to `RALPH-PROMPT.md` for a fresh `Agent()` subagent to read.
 
 $ARGUMENTS
