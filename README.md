@@ -161,7 +161,7 @@ The repo splits into four directories so the mode boundary is obvious:
 | File | Purpose |
 |------|---------|
 | `cc-headless/ralph.sh` | Headless runner — uses `claude -p` |
-| `cc/ralph-prep.sh` | Per-iteration bookkeeping + prompt builder invoked by the `/ralph-lnb` skill; stdout is the filled prompt |
+| `cc/ralph-prep.sh` | Per-iteration bookkeeping + prompt builder invoked by the `/ralph-lnb` skill; writes the filled prompt to `RALPH-PROMPT.md`, stdout is a one-line status |
 | `skill/SKILL.md.template` | Skill template — `install.sh` renders this into `~/.claude/skills/ralph-lnb/SKILL.md` with absolute paths |
 | `shared/ralph-lib.sh` | Shared bash helpers sourced by both runners |
 | `shared/PROMPT.md` | Prompt template with `<!-- FILL:xxx -->` markers |

@@ -117,15 +117,15 @@ ensure_notebook
 # (see ralph.sh:150-154) so both runners build byte-identical prompts.
 history=$(query_recent_history)
 
-# Write the filled prompt to a file in the project dir (parent of the
-# notebook dir) instead of stdout, so the /ralph-lnb main agent never has
-# to hold the full prompt in its context. The subagent reads this file.
-# With the default NOTEBOOK_DIR=.lnb, dirname resolves to "." (project dir).
-PROMPT_OUT="$(dirname "$NOTEBOOK_DIR")/RALPH-PROMPT.md"
+# Write the filled prompt to RALPH-PROMPT.md in the cwd instead of stdout,
+# so the /ralph-lnb main agent never has to hold the full prompt in its
+# context. The subagent reads this file at the same fixed path (the skill's
+# Agent() call hardcodes ./RALPH-PROMPT.md), so anchor it to the cwd here.
+PROMPT_OUT="./RALPH-PROMPT.md"
 build_prompt "$history" > "$PROMPT_OUT"
 echo "Wrote iteration $ITERATION prompt to $PROMPT_OUT"
 
-# Route the emit confirmation to stderr so stdout stays a single status line.
+# Route lab-notebook's start-entry output to stderr so stdout stays a single status line.
 if [[ -n "$MAX_ITERATIONS" ]]; then
     log_to_notebook "start" "ralph-lnb: starting iteration $ITERATION/$MAX_ITERATIONS" >&2
 else
