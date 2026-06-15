@@ -157,7 +157,27 @@ assert_no_last_branch
 pass "batch refused with clear message (exit 3); --force re-spins it (exit 0)"
 
 ###############################################################################
-echo "== Assertion 5: no .ralph-last-branch anywhere in the sandbox =="
+echo "== Assertion 5: a partial batch is NOT refused even when recorded complete =="
+###############################################################################
+# completed_branch still equals BRANCH2 from Assertion 4, but batch_already_complete
+# ANDs tasks_all_pass — so flipping ONE story to passes:false must make a plain run
+# (no --force) prep normally and exit 0, never the refuse-respin exit 3.
+tmp="$(mktemp "$WORKROOT/tasks.XXXXXX")"
+jq '.stories[0].passes = false' tasks.json > "$tmp"; mv "$tmp" tasks.json
+[[ "$(jq -r '.completed_branch' "$STATE_FILE")" == "$BRANCH2" ]] \
+    || fail "precondition: completed_branch should still be '$BRANCH2' for this check"
+rm -f ".ralph/prompt.md"
+LOG="$WORKROOT/log5-partial"
+rc=0
+run_prep "$LOG" --iteration 1 || rc=$?
+[[ "$rc" -eq 0 ]] \
+    || fail "partial batch was refused (exit $rc); expected normal prep (exit 0): $(cat "$LOG")"
+[[ -f ".ralph/prompt.md" ]] || fail "partial-batch run did not write .ralph/prompt.md"
+assert_no_last_branch
+pass "partial batch preps normally (exit 0) despite completed_branch match"
+
+###############################################################################
+echo "== Assertion 6: no .ralph-last-branch anywhere in the sandbox =="
 ###############################################################################
 if find "$SANDBOX" -name '.ralph-last-branch' -print | grep -q .; then
     fail "a .ralph-last-branch file exists in the sandbox"

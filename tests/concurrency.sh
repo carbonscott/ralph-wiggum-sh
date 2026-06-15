@@ -9,6 +9,12 @@ set -euo pipefail
 # contention-free — both entries persist in distinct entries/ralph-*.jsonl
 # files and both are returned by a single `lab-notebook sql`, with nothing lost.
 #
+# To exercise a REAL race (not just sequential disambiguation), the two emits
+# run as backgrounded jobs and we `wait` for both: the writers genuinely append
+# at the same time. This is deterministically safe precisely because per-writer
+# isolation gives each its OWN entries/ralph-<branch>.jsonl — there is no shared
+# file for them to clobber, so concurrent appends never collide.
+#
 # This is the "opt-in --notebook shared mode" surface: there is no special
 # flag; both runners already accept --notebook <shared-path>, and writer
 # disambiguation (LAB_NOTEBOOK_WRITER=ralph-<branch>, set by log_to_notebook)
@@ -61,10 +67,17 @@ emit_as() {
 }
 
 ###############################################################################
-echo "== Two loops on different branches emit into ONE shared notebook =="
+echo "== Two loops on different branches emit CONCURRENTLY into ONE shared notebook =="
 ###############################################################################
-emit_as "ralph/loop-a" "loop A: entry from branch a"
-emit_as "ralph/loop-b" "loop B: entry from branch b"
+# Background BOTH emits and wait for the pair, so the two writers append at the
+# same time — a genuine race. Each runs in its own subshell, so emit_as's local
+# BRANCH/CONTEXT for one loop can't leak into the other. Per-writer isolation
+# (distinct entries/ralph-<branch>.jsonl) makes this deterministically safe.
+emit_as "ralph/loop-a" "loop A: entry from branch a" & pid_a=$!
+emit_as "ralph/loop-b" "loop B: entry from branch b" & pid_b=$!
+# wait per-pid so a failed background emit fails the test (bare `wait` swallows it).
+wait "$pid_a" || fail "concurrent emit for loop-a failed"
+wait "$pid_b" || fail "concurrent emit for loop-b failed"
 
 ENTRIES_DIR="$NOTEBOOK_DIR/entries"
 [[ -d "$ENTRIES_DIR" ]] || fail "no entries/ dir under shared notebook ($ENTRIES_DIR)"
@@ -112,4 +125,4 @@ $ROWS"
 pass "single sql returns both writers' entries (count=2); no lost entries"
 
 echo ""
-echo "PASS: shared-notebook per-writer concurrency holds."
+echo "PASS: shared-notebook concurrent writes are contention-free (per-writer)."
