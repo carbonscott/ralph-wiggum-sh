@@ -242,3 +242,21 @@ in this repo for the pre-substitution source).
 
 When the `branch` field in `tasks.json` changes between runs, both runners
 archive the previous task file and notebook to `archive/<date>-<branch>/`.
+
+## Shared notebook across loops / worktrees
+
+By default each project dir (or git worktree) is its own cwd and gets its own
+`.ralph/.lnb` notebook — no setup, no contention.
+
+For the power user who wants several loops to *share* one notebook (e.g. one
+notebook spanning several worktrees so each loop can learn from the others),
+point them all at one path with `--notebook <shared-path>`. There is no extra
+flag: ralph attributes every entry to a per-loop writer
+`ralph-<branch>` (the branch slug from `tasks.json`, e.g. branch `ralph/foo`
+&rarr; writer `ralph-foo`), via `LAB_NOTEBOOK_WRITER` set on each
+`lab-notebook emit` call. Because the notebook stores one append-only
+`entries/<writer>.jsonl` per writer, concurrent loops on different branches
+never collide — each writes its own file, and a single `lab-notebook sql`
+query still sees them all. (Two loops sharing **one** branch in **one** cwd
+still share both the prompt file and the writer; real isolation is separate
+cwds/worktrees and/or distinct branches.)

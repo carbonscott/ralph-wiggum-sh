@@ -26,6 +26,25 @@ read_task_meta() {
     jq -r ".$key // empty" "$TASK_FILE" 2>/dev/null || echo ""
 }
 
+# --- Branch slug + writer identity ---
+# Normalize a branch name into a filesystem-safe slug: strip a leading
+# "ralph/" then turn any remaining "/" into "-". E.g. ralph/foo -> foo,
+# feature/x -> feature-x, main -> main. ONE definition shared by both the
+# archive-folder name and the notebook writer id, so they can't drift.
+branch_slug() {
+    echo "$1" | sed 's|^ralph/||; s|/|-|g'
+}
+
+# Per-loop notebook writer id, derived from BRANCH alone so it is identical
+# between both runners (byte-identical prompt contract) and reproducible from
+# BRANCH for the prompt-diff test. Defaults to "main" (same as build_prompt's
+# branch default). E.g. ralph/foo -> ralph-foo, ralph/smoke-test ->
+# ralph-smoke-test, feature/x -> ralph-feature-x, <unset> -> ralph-main.
+# Set as a PROCESS ENV VAR on the lab-notebook emit call, never in .lnb.env.
+notebook_writer() {
+    echo "ralph-$(branch_slug "${BRANCH:-main}")"
+}
+
 # --- State (.ralph/state.json) helpers ---
 # Read a single field from the state cursor. Echoes "" when the file is
 # missing, empty, malformed, or the field is absent/null.
@@ -105,7 +124,7 @@ archive_previous_run() {
         if [[ -n "$BRANCH" && -n "$last_branch" && "$BRANCH" != "$last_branch" ]]; then
             local date_str folder_name archive_folder
             date_str=$(date +%Y-%m-%d)
-            folder_name=$(echo "$last_branch" | sed 's|^ralph/||; s|/|-|g')
+            folder_name=$(branch_slug "$last_branch")
             archive_folder="$ARCHIVE_DIR/$date_str-$folder_name"
 
             echo "Archiving previous run: $last_branch" >&2
@@ -140,7 +159,12 @@ log_to_notebook() {
     local entry_type="$1"
     local message="$2"
     if command -v lab-notebook &>/dev/null && [[ -d "$NOTEBOOK_DIR" ]]; then
-        LAB_NOTEBOOK_DIR="$NOTEBOOK_DIR" lab-notebook emit \
+        # Attribute the entry to a per-loop writer (ralph-<branch-slug>), set as
+        # a process env var on the same command line so it is exported into the
+        # lab-notebook subprocess. This keeps several worktrees/loops pointed at
+        # one shared --notebook contention-free (per-writer JSONL).
+        LAB_NOTEBOOK_DIR="$NOTEBOOK_DIR" LAB_NOTEBOOK_WRITER="$(notebook_writer)" \
+            lab-notebook emit \
             --context "$CONTEXT" --type "$entry_type" \
             --branch "${BRANCH:-}" --tags "ralph-harness" \
             "$message" 2>/dev/null || true
@@ -170,10 +194,13 @@ build_prompt() {
     local prompt
     prompt=$(cat "$PROMPT_FILE")
 
-    # Replace FILL markers
+    # Replace FILL markers. The writer is derived from BRANCH alone (same as the
+    # runner's log_to_notebook), so both runners render the identical value and
+    # the byte-identical prompt contract holds.
     prompt="${prompt//<!-- FILL:context -->/$CONTEXT}"
     prompt="${prompt//<!-- FILL:notebook_dir -->/$NOTEBOOK_DIR}"
     prompt="${prompt//<!-- FILL:branch -->/${BRANCH:-main}}"
+    prompt="${prompt//<!-- FILL:writer -->/$(notebook_writer)}"
     prompt="${prompt//<!-- FILL:tasks -->/$tasks_content}"
     prompt="${prompt//<!-- FILL:recent_history -->/$history}"
 
