@@ -9,6 +9,12 @@ Exercises both modes so you can verify the `/ralph-lnb` skill and
 
 - `tasks.json` — 2-story fixture (create `hello.txt`, append a line)
 - `setup-sandbox.sh` — scaffolds a timestamped sandbox under `$TMPDIR`
+- `prompt-diff.sh` — exit-code regression test asserting the two runners
+  (`cc-headless/ralph.sh` and `cc/ralph-prep.sh`) build byte-identical
+  prompts, and that recent history is queried before the iteration's own
+  `start` entry is logged. Run with `bash tests/prompt-diff.sh` (exits 0 on
+  pass; prints a diff and exits non-zero on divergence). Self-contained:
+  uses its own `$TMPDIR` sandboxes and needs no install.
 
 Prerequisite: run `../install.sh` once from the repo so `ralph` is on
 `$PATH` and `/ralph-lnb` is registered as a Claude Code skill. If you
