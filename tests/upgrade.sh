@@ -195,6 +195,60 @@ echo "$gotp" | grep -qF "$KNOWN_ENTRY" || fail "partial: notebook clobbered (ent
 [[ ! -e "$P_DIR/archive" ]] || fail "partial: ./archive not removed"
 pass "partial-migration tree converges: notebook untouched, cursor + archive completed"
 
+# (h) Dangling-pointer reconciliation: an interrupted run moved ./.lnb ->
+#     .ralph/.lnb but died BEFORE rewriting .lnb.env, leaving the pointer at the
+#     now-missing ./.lnb. A later migrate must repoint it at .ralph/.lnb so a
+#     bare discovery (no explicit env var) still resolves the notebook.
+H_DIR="$WORKROOT/dangling"
+seed_old_layout "$H_DIR"
+OLD_ABS_LNB="$H_DIR/.lnb"
+mkdir -p "$H_DIR/.ralph"
+mv "$H_DIR/.lnb" "$H_DIR/.ralph/.lnb"
+# Pointer left dangling at the OLD absolute path (the interrupted-move bug).
+printf '# Project-local lab-notebook configuration\nexport LAB_NOTEBOOK_DIR=%s\n' \
+    "$OLD_ABS_LNB" > "$H_DIR/.lnb.env"
+[[ ! -d "$OLD_ABS_LNB" ]] || fail "h: precondition — old ./.lnb should be gone"
+(
+    cd "$H_DIR"
+    STATE_FILE=".ralph/state.json"
+    # shellcheck source=/dev/null
+    source "$SHARED_DIR/ralph-lib.sh"
+    migrate_old_layout
+)
+H_ABS="$H_DIR/.ralph/.lnb"
+h_env=$(sed -n 's/^[[:space:]]*\(export[[:space:]]\+\)\?LAB_NOTEBOOK_DIR=//p' "$H_DIR/.lnb.env" | head -1)
+[[ "$h_env" == "$H_ABS" ]] \
+    || fail "h: dangling pointer not reconciled; .lnb.env is '$h_env', expected '$H_ABS'"
+hdisc=$(cd "$H_DIR" && lab-notebook sql \
+    "SELECT content FROM entries WHERE content='$KNOWN_ENTRY'" 2>/dev/null || true)
+echo "$hdisc" | grep -qF "$KNOWN_ENTRY" \
+    || fail "h: discovery via reconciled .lnb.env broken; got: $hdisc"
+pass "dangling .lnb.env pointer reconciled to .ralph/.lnb after an interrupted move"
+
+# (i) Both-notebooks-exist: a stale ./.lnb lingering alongside an already-migrated
+#     .ralph/.lnb must be LEFT IN PLACE (never deleted/merged) with a loud warning
+#     — silent orphaning of the old history is the failure mode being guarded.
+I_DIR="$WORKROOT/bothexist"
+seed_old_layout "$I_DIR"
+mkdir -p "$I_DIR/.ralph"
+cp -a "$I_DIR/.lnb" "$I_DIR/.ralph/.lnb"   # already-migrated copy present...
+[[ -d "$I_DIR/.lnb" && -d "$I_DIR/.ralph/.lnb" ]] \
+    || fail "i: precondition — both notebooks should exist"   # ...and ./.lnb still lingers
+ILOG="$WORKROOT/bothexist.log"
+(
+    cd "$I_DIR"
+    STATE_FILE=".ralph/state.json"
+    # shellcheck source=/dev/null
+    source "$SHARED_DIR/ralph-lib.sh"
+    migrate_old_layout
+) >"$ILOG" 2>&1
+grep -qiF 'both ./.lnb and .ralph/.lnb exist' "$ILOG" \
+    || fail "i: expected a both-exist WARNING; got: $(cat "$ILOG")"
+[[ -d "$I_DIR/.lnb" ]] \
+    || fail "i: stale ./.lnb was destroyed (history must be preserved, not deleted)"
+[[ -d "$I_DIR/.ralph/.lnb" ]] || fail "i: .ralph/.lnb disturbed"
+pass "both-notebooks-exist: ./.lnb preserved untouched with a loud warning (no silent data loss)"
+
 ###############################################################################
 echo "== PART B: end-to-end through cc/ralph-prep.sh =="
 ###############################################################################

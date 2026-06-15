@@ -31,6 +31,9 @@ read_task_meta() {
 # "ralph/" then turn any remaining "/" into "-". E.g. ralph/foo -> foo,
 # feature/x -> feature-x, main -> main. ONE definition shared by both the
 # archive-folder name and the notebook writer id, so they can't drift.
+# NOTE: not injective — `ralph/foo` and `foo` both slug to `foo` (likewise
+# `ralph/a/b` and `a-b`), so two branches differing only by a leading `ralph/`
+# (or `/` vs `-`) share an archive folder and, in shared-notebook mode, a writer.
 branch_slug() {
     echo "$1" | sed 's|^ralph/||; s|/|-|g'
 }
@@ -169,29 +172,36 @@ migrate_old_layout() {
     local migrated_tracked=0
 
     # 1) Notebook: MOVE ./.lnb -> .ralph/.lnb (never re-init over it). Guarded so
-    #    a second run (target present) is a no-op and a half-migrated tree where
-    #    .ralph/.lnb already exists is left untouched.
+    #    a second run (target present) is a no-op. The pointer is reconciled
+    #    separately below so an interrupted move (moved, but died before the
+    #    pointer rewrite) still converges on a later run.
     if [[ -d ./.lnb && ! -e .ralph/.lnb ]]; then
-        mv ./.lnb .ralph/.lnb
-        # Rewrite the root pointer so LAB_NOTEBOOK_DIR is the new ABSOLUTE path.
-        # Match the format `lab-notebook init` writes: an `export
-        # LAB_NOTEBOOK_DIR=<abs>` line (lab-notebook parses only that key). We
-        # surgically replace just that line in an existing .lnb.env (preserving
-        # the comment + any LAB_NOTEBOOK_WRITER line); if there's no such line
-        # or no file, (re)write the pointer in the canonical init format.
         local abs_nb
+        mv ./.lnb .ralph/.lnb
         abs_nb="$(cd .ralph/.lnb && pwd)"
-        if [[ -f ./.lnb.env ]] && grep -q '^[[:space:]]*\(export[[:space:]]\+\)\?LAB_NOTEBOOK_DIR=' ./.lnb.env; then
-            local tmp_env
-            tmp_env="$(mktemp ./.lnb.env.XXXXXX)"
-            sed "s|^\([[:space:]]*\(export[[:space:]]\+\)\?\)LAB_NOTEBOOK_DIR=.*|\1LAB_NOTEBOOK_DIR=$abs_nb|" \
-                ./.lnb.env > "$tmp_env"
-            mv "$tmp_env" ./.lnb.env
-        else
-            printf '# Project-local lab-notebook configuration\nexport LAB_NOTEBOOK_DIR=%s\n' \
-                "$abs_nb" > ./.lnb.env
-        fi
+        write_notebook_pointer "$abs_nb"
         echo "Migrated notebook: ./.lnb -> .ralph/.lnb (pointer .lnb.env -> $abs_nb)" >&2
+    elif [[ -d ./.lnb && -d .ralph/.lnb ]]; then
+        # Both old and new notebooks exist — an earlier interrupted run or manual
+        # state stranded ./.lnb. We never auto-merge or delete history; warn
+        # loudly so the user reconciles, otherwise ./.lnb is silently ignored.
+        echo "WARNING: both ./.lnb and .ralph/.lnb exist; ./.lnb is left in place and its history is NOT used." >&2
+        echo "  Reconcile manually, then 'rm -rf ./.lnb' once you've confirmed .ralph/.lnb is the notebook to keep." >&2
+    fi
+
+    # Reconcile the .lnb.env pointer even when the MOVE happened in a prior
+    # (possibly interrupted) run that died before rewriting it: if the notebook
+    # lives at .ralph/.lnb but the pointer resolves to a missing dir, repoint it.
+    # Idempotent — a pointer already resolving to a real dir is left untouched,
+    # so a deliberate custom LAB_NOTEBOOK_DIR is never clobbered.
+    if [[ -d .ralph/.lnb && -f ./.lnb.env ]]; then
+        local abs_nb cur_dir
+        abs_nb="$(cd .ralph/.lnb && pwd)"
+        cur_dir="$(sed -n 's|^[[:space:]]*\(export[[:space:]]\+\)\?LAB_NOTEBOOK_DIR=\(.*\)|\2|p' ./.lnb.env | head -1)"
+        if [[ -n "$cur_dir" && ! -d "$cur_dir" ]]; then
+            write_notebook_pointer "$abs_nb"
+            echo "Reconciled stale notebook pointer: .lnb.env -> $abs_nb" >&2
+        fi
     fi
 
     # 2) Cursor: translate ./.ralph-last-branch (a bare branch string) into
@@ -224,6 +234,31 @@ migrate_old_layout() {
     if [[ "$migrated_tracked" -eq 1 ]]; then
         echo "If these were tracked in git, run: git rm --cached .ralph-last-branch archive" >&2
         echo "  (drops the now-migrated, gitignored files from the index; safe to skip in a non-git dir)" >&2
+    fi
+}
+
+# Write/replace the LAB_NOTEBOOK_DIR line in ./.lnb.env so it points at $1 (an
+# absolute notebook dir), matching the `export LAB_NOTEBOOK_DIR=<abs>` format
+# `lab-notebook init` writes (lab-notebook parses only that key). Surgically
+# replaces just that line if present (preserving the comment + any
+# LAB_NOTEBOOK_WRITER line); otherwise (re)writes the pointer in canonical init
+# format. The replacement is escaped so a `\`, `&`, or the `|` sed delimiter in
+# the path can't corrupt the expression.
+write_notebook_pointer() {
+    local abs_nb="$1" esc tmp_env
+    if [[ -f ./.lnb.env ]] && grep -q '^[[:space:]]*\(export[[:space:]]\+\)\?LAB_NOTEBOOK_DIR=' ./.lnb.env; then
+        # Escape sed-replacement metacharacters; backslashes FIRST so the ones we
+        # add below aren't doubled again.
+        esc=${abs_nb//\\/\\\\}
+        esc=${esc//&/\\&}
+        esc=${esc//|/\\|}
+        tmp_env="$(mktemp ./.lnb.env.XXXXXX)"
+        sed "s|^\([[:space:]]*\(export[[:space:]]\+\)\?\)LAB_NOTEBOOK_DIR=.*|\1LAB_NOTEBOOK_DIR=$esc|" \
+            ./.lnb.env > "$tmp_env"
+        mv "$tmp_env" ./.lnb.env
+    else
+        printf '# Project-local lab-notebook configuration\nexport LAB_NOTEBOOK_DIR=%s\n' \
+            "$abs_nb" > ./.lnb.env
     fi
 }
 
