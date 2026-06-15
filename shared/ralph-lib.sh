@@ -140,8 +140,98 @@ archive_previous_run() {
     fi
 }
 
+# --- One-time upgrade shim: OLD layout -> .ralph/ layout ---
+# Older installs scattered ralph state across the project root:
+#   ./.lnb/            the notebook        -> .ralph/.lnb
+#   ./.lnb.env         pointer (abs path)  -> rewritten to point at .ralph/.lnb
+#   ./.ralph-last-branch  bare branch cursor -> .ralph/state.json
+#   ./archive/         old snapshots       -> .ralph/archive
+#
+# This migrates such a tree ONCE, in place, without data loss, and is a clean
+# no-op on every later run. It runs at the top of ensure_notebook (BEFORE the
+# fresh-init check) so a fresh `.ralph/.lnb` is never created over a user's
+# existing history. Both runners reach it via ensure_notebook.
+#
+# Each step is independently guarded on "new target absent", so a tree that was
+# only partially migrated by an interrupted run converges safely: no step ever
+# double-moves or clobbers, and the whole helper is safe under set -euo pipefail.
+# It MUST NOT invoke git (ralph is git-optional and must work in a plain
+# non-git dir); when it migrates files that may be git-tracked it only PRINTS
+# guidance to stderr, leaving untracking to the user.
+migrate_old_layout() {
+    # Nothing to do unless at least one OLD-layout artifact is present. Avoids
+    # creating a stray .ralph/ on fresh projects (the shim must be inert there).
+    if [[ ! -e ./.lnb && ! -e ./.lnb.env && ! -e ./.ralph-last-branch && ! -e ./archive ]]; then
+        return 0
+    fi
+
+    mkdir -p .ralph
+    local migrated_tracked=0
+
+    # 1) Notebook: MOVE ./.lnb -> .ralph/.lnb (never re-init over it). Guarded so
+    #    a second run (target present) is a no-op and a half-migrated tree where
+    #    .ralph/.lnb already exists is left untouched.
+    if [[ -d ./.lnb && ! -e .ralph/.lnb ]]; then
+        mv ./.lnb .ralph/.lnb
+        # Rewrite the root pointer so LAB_NOTEBOOK_DIR is the new ABSOLUTE path.
+        # Match the format `lab-notebook init` writes: an `export
+        # LAB_NOTEBOOK_DIR=<abs>` line (lab-notebook parses only that key). We
+        # surgically replace just that line in an existing .lnb.env (preserving
+        # the comment + any LAB_NOTEBOOK_WRITER line); if there's no such line
+        # or no file, (re)write the pointer in the canonical init format.
+        local abs_nb
+        abs_nb="$(cd .ralph/.lnb && pwd)"
+        if [[ -f ./.lnb.env ]] && grep -q '^[[:space:]]*\(export[[:space:]]\+\)\?LAB_NOTEBOOK_DIR=' ./.lnb.env; then
+            local tmp_env
+            tmp_env="$(mktemp ./.lnb.env.XXXXXX)"
+            sed "s|^\([[:space:]]*\(export[[:space:]]\+\)\?\)LAB_NOTEBOOK_DIR=.*|\1LAB_NOTEBOOK_DIR=$abs_nb|" \
+                ./.lnb.env > "$tmp_env"
+            mv "$tmp_env" ./.lnb.env
+        else
+            printf '# Project-local lab-notebook configuration\nexport LAB_NOTEBOOK_DIR=%s\n' \
+                "$abs_nb" > ./.lnb.env
+        fi
+        echo "Migrated notebook: ./.lnb -> .ralph/.lnb (pointer .lnb.env -> $abs_nb)" >&2
+    fi
+
+    # 2) Cursor: translate ./.ralph-last-branch (a bare branch string) into
+    #    .ralph/state.json in the LANDED schema, then remove the old file.
+    #    Guarded so we never overwrite an existing state.json.
+    if [[ -f ./.ralph-last-branch && ! -e .ralph/state.json ]]; then
+        local old_branch now
+        old_branch="$(tr -d '\n' < ./.ralph-last-branch | sed 's/[[:space:]]*$//')"
+        now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+        jq -n \
+            --arg branch "$old_branch" \
+            --arg last_run "$now" \
+            '{branch: $branch, last_run: $last_run, completed_branch: null}' \
+            > .ralph/state.json
+        rm -f ./.ralph-last-branch
+        migrated_tracked=1
+        echo "Migrated cursor: ./.ralph-last-branch (branch '$old_branch') -> .ralph/state.json" >&2
+    fi
+
+    # 3) Archive: MOVE ./archive -> .ralph/archive. Guarded on target absent.
+    if [[ -d ./archive && ! -e .ralph/archive ]]; then
+        mv ./archive .ralph/archive
+        migrated_tracked=1
+        echo "Migrated archive: ./archive -> .ralph/archive" >&2
+    fi
+
+    # If we moved files that the user may have committed (the OLD cursor /
+    # archive leaked into git), point them at the manual cleanup. We NEVER run
+    # git ourselves — ralph is git-optional and untracking is the user's call.
+    if [[ "$migrated_tracked" -eq 1 ]]; then
+        echo "If these were tracked in git, run: git rm --cached .ralph-last-branch archive" >&2
+        echo "  (drops the now-migrated, gitignored files from the index; safe to skip in a non-git dir)" >&2
+    fi
+}
+
 # --- Notebook helpers ---
 ensure_notebook() {
+    # Migrate any OLD-layout state in place BEFORE the fresh-init check, so we
+    # never init a fresh empty .ralph/.lnb over a user's existing notebook.
+    migrate_old_layout
     if [[ ! -d "$NOTEBOOK_DIR" ]]; then
         # `lab-notebook init .ralph` forces a `/.lnb` leaf and writes a root
         # .lnb.env pointing at it with an ABSOLUTE path, plus the notebook's

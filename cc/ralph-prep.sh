@@ -141,6 +141,12 @@ if [[ "$FORCE" -ne 1 ]] && batch_already_complete; then
 fi
 
 # --- Bookkeeping ---
+# Migrate any OLD on-disk layout (./.lnb, ./.ralph-last-branch, ./archive) into
+# .ralph/ BEFORE archive bookkeeping, so archive_previous_run reads the migrated
+# cursor (.ralph/state.json) and detects a real branch transition. Idempotent
+# no-op on already-migrated / fresh trees. (ensure_notebook also calls this, so
+# the shim is reached even if a future caller skips this line.)
+migrate_old_layout
 # archive_previous_run and ensure_notebook are both idempotent — safe to
 # call on every iteration. archive_previous_run only actually archives on a
 # real branch transition (recorded cursor in $STATE_FILE differs from BRANCH).
