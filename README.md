@@ -74,8 +74,17 @@ customize the template. **Upgrading from an older checkout?** A stale
 it if you never customized it, or pass `--prompt ./PROMPT.md`
 explicitly if you did.
 
-The runner auto-initializes `.lnb/` with the coding schema on the first
-iteration — no manual `lab-notebook init` needed.
+On the next run, ralph also relocates any old-layout state — `./.lnb`,
+`./.ralph-last-branch`, and `./archive/` — into `.ralph/` and rewrites
+the root `.lnb.env` pointer. The move is one-time and idempotent: once
+the state lives under `.ralph/`, later runs leave it alone. If any of
+those old paths were committed to git, ralph prints a `git rm --cached
+.ralph-last-branch archive` hint — run it to drop those stale index
+entries now that their content lives under the gitignored `.ralph/`
+(ralph never runs git itself).
+
+The runner auto-initializes `.ralph/.lnb` with the coding schema on the
+first iteration — no manual `lab-notebook init` needed.
 
 Then pick one runner:
 
@@ -94,19 +103,26 @@ Start Claude Code in `acceptEdits` mode, then in the session:
 (Restart any running Claude Code sessions after install — skills load
 at session start.)
 
-`tasks.json` is the entire footprint in your project dir. The prompt
-template, shared lib, helper scripts, and notebook schema all stay in
-the repo and are invoked or sourced by `ralph` / `/ralph-lnb` (or by
-absolute path if you skipped install).
+`tasks.json` is the only file you author and commit in your project
+dir. Everything ralph generates — the notebook, the per-iteration
+prompt, the batch cursor, and archived `tasks.json` snapshots — lives
+under one gitignored `.ralph/` directory, with a small `.lnb.env`
+pointer at the root so a bare `/lnb recall` finds the notebook; a full
+reset is `rm -rf .ralph/ .lnb.env` (the root pointer lives outside
+`.ralph/`, so dropping it too avoids a dangling reference until the
+next run regenerates it). The prompt template, shared lib, helper
+scripts, and notebook schema all stay in the repo and are invoked or
+sourced by `ralph` / `/ralph-lnb` (or by absolute path if you skipped
+install).
 
 ## How It Works
 
 ```
-tasks.json (what to do)  +  .lnb/ (what happened)  +  PROMPT.md (how to do it)
-           │                       │                           │
-           └───────────┬───────────┘                           │
-                       ▼                                       │
-              runner   builds prompt ◄─────────────────────────┘
+tasks.json (what to do)  +  .ralph/.lnb (what happened)  +  PROMPT.md (how to do it)
+           │                             │                           │
+           └───────────┬─────────────────┘                           │
+                       ▼                                             │
+              runner   builds prompt ◄───────────────────────────────┘
                      │
               ┌──────┴──────────────────────┐
               │  for each iteration:        │
@@ -123,7 +139,7 @@ tasks.json (what to do)  +  .lnb/ (what happened)  +  PROMPT.md (how to do it)
 ## Two runners, same loop
 
 Ralph ships two entry points that share the same `PROMPT.md`, `tasks.json`,
-`.lnb/`, and `archive/` state:
+and `.ralph/` state (notebook, per-iteration prompt, batch cursor, archives):
 
 - **`ralph`** (headless, terminal) — runs in a terminal and spawns a
   fresh `claude -p` per iteration. Truly stateless outer loop. Backed
@@ -161,7 +177,7 @@ The repo splits into four directories so the mode boundary is obvious:
 | File | Purpose |
 |------|---------|
 | `cc-headless/ralph.sh` | Headless runner — uses `claude -p` |
-| `cc/ralph-prep.sh` | Per-iteration bookkeeping + prompt builder invoked by the `/ralph-lnb` skill; writes the filled prompt to `RALPH-PROMPT.md`, stdout is a one-line status |
+| `cc/ralph-prep.sh` | Per-iteration bookkeeping + prompt builder invoked by the `/ralph-lnb` skill; writes the filled prompt to `.ralph/prompt.md`, stdout is a one-line status |
 | `skill/SKILL.md.template` | Skill template — `install.sh` renders this into `~/.claude/skills/ralph-lnb/SKILL.md` with absolute paths |
 | `shared/ralph-lib.sh` | Shared bash helpers sourced by both runners |
 | `shared/PROMPT.md` | Prompt template with `<!-- FILL:xxx -->` markers |
@@ -217,7 +233,7 @@ The `coding-dev.yaml` schema provides entry types tailored for coding:
 
 Query patterns from all iterations:
 ```bash
-LAB_NOTEBOOK_DIR=.lnb lab-notebook sql \
+LAB_NOTEBOOK_DIR=.ralph/.lnb lab-notebook sql \
   "SELECT content FROM entries WHERE type='pattern' ORDER BY ts"
 ```
 
@@ -227,9 +243,11 @@ LAB_NOTEBOOK_DIR=.lnb lab-notebook sql \
 --max-iterations N      Safety cap (default: 10)
 --prompt FILE           Custom prompt template (default: repo's shared/PROMPT.md)
 --task-file FILE        Task file (default: tasks.json)
---notebook DIR          Notebook directory (default: .lnb)
+--notebook DIR          Notebook directory (default: .ralph/.lnb)
 --context SLUG          Notebook context (default: from branch)
---archive-dir DIR       Archive directory (default: archive/)
+--archive-dir DIR       Archive directory (default: .ralph/archive)
+--force                 Re-spin even when this branch's all-green batch
+                        was already recorded complete in .ralph/state.json
 ```
 
 For the Claude Code session runner, invoke it as `/ralph-lnb
@@ -240,5 +258,26 @@ in this repo for the pre-substitution source).
 
 ## Archive
 
-When the `branch` field in `tasks.json` changes between runs, both runners
-archive the previous task file and notebook to `archive/<date>-<branch>/`.
+When the recorded cursor in `.ralph/state.json` shows the `branch` has
+changed since the last run, both runners snapshot the previous
+`tasks.json` — only the task file, not the notebook (it self-archives by
+`context`) — to `.ralph/archive/<date>-<branch>/`. A first run records the
+cursor and archives nothing; a same-branch re-run archives nothing.
+
+## Shared notebook across loops / worktrees
+
+By default each project dir (or git worktree) is its own cwd and gets its own
+`.ralph/.lnb` notebook — no setup, no contention.
+
+For the power user who wants several loops to *share* one notebook (e.g. one
+notebook spanning several worktrees so each loop can learn from the others),
+point them all at one path with `--notebook <shared-path>`. There is no extra
+flag: ralph attributes every entry to a per-loop writer
+`ralph-<branch>` (the branch slug from `tasks.json`, e.g. branch `ralph/foo`
+&rarr; writer `ralph-foo`), via `LAB_NOTEBOOK_WRITER` set on each
+`lab-notebook emit` call. Because the notebook stores one append-only
+`entries/<writer>.jsonl` per writer, concurrent loops on different branches
+never collide — each writes its own file, and a single `lab-notebook sql`
+query still sees them all. (Two loops sharing **one** branch in **one** cwd
+still share both the prompt file and the writer; real isolation is separate
+cwds/worktrees and/or distinct branches.)

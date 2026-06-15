@@ -5,11 +5,12 @@ set -euo pipefail
 MAX_ITERATIONS=10
 PROMPT_FILE=""
 TASK_FILE="tasks.json"
-NOTEBOOK_DIR=".lnb"
+NOTEBOOK_DIR=".ralph/.lnb"
 CONTEXT=""
-ARCHIVE_DIR="archive"
+ARCHIVE_DIR=".ralph/archive"
 COMPLETION_PROMISE="DONE"
 ALL_DONE_PROMISE="ALL_DONE"
+FORCE=0
 
 # Resolve symlinks so SHARED_DIR is correct when the runner is symlinked
 # into $PATH. Walks a chain of relative or absolute symlinks.
@@ -34,9 +35,13 @@ Options:
   --max-iterations N      Safety cap (default: 10)
   --prompt FILE           Custom prompt template (default: repo's shared/PROMPT.md)
   --task-file FILE        Task file with stories (default: tasks.json)
-  --notebook DIR          Lab-notebook directory (default: .lnb)
+  --notebook DIR          Lab-notebook directory (default: .ralph/.lnb)
   --context SLUG          Notebook context (default: derived from branch)
-  --archive-dir DIR       Where to archive old runs (default: archive/)
+  --archive-dir DIR       Where to archive old runs (default: .ralph/archive)
+  --force                 Re-spin even when this branch's all-green batch was
+                          already recorded complete in .ralph/state.json.
+                          Bypasses the refuse-respin guard only; archive
+                          behavior is unchanged.
   -h, --help              Show this help
 
 The loop exits when:
@@ -61,6 +66,7 @@ while [[ $# -gt 0 ]]; do
         --notebook)        NOTEBOOK_DIR="$2"; shift 2 ;;
         --context)         CONTEXT="$2"; shift 2 ;;
         --archive-dir)     ARCHIVE_DIR="$2"; shift 2 ;;
+        --force)           FORCE=1; shift ;;
         -h|--help)         usage ;;
         *)                 echo "Unknown option: $1" >&2; usage ;;
     esac
@@ -94,7 +100,7 @@ else
 fi
 
 # --- Shared helpers ---
-LAST_BRANCH_FILE=".ralph-last-branch"
+STATE_FILE=".ralph/state.json"
 source "$SHARED_DIR/ralph-lib.sh"
 
 # --- Read task file metadata ---
@@ -126,7 +132,25 @@ format_stream() {
     ' 2>/dev/null
 }
 
+# --- Refuse re-spinning an already-completed batch (G3) ---
+# If this branch's batch is all-green AND was recorded complete in
+# .ralph/state.json, refuse to loop again. --force bypasses this guard only;
+# it does not change archive behavior. Checked before archiving so a finished
+# batch never touches state.
+if [[ "$FORCE" -ne 1 ]] && batch_already_complete; then
+    echo "=== Batch already complete ==="
+    echo "Branch '${BRANCH:-<none>}': all stories pass and this batch was recorded complete in $STATE_FILE."
+    echo "Nothing to do. Add or unset stories in $TASK_FILE (or start a new branch), or pass --force to re-spin anyway."
+    exit 0
+fi
+
 # --- Main ---
+# Migrate any OLD on-disk layout (./.lnb, ./.ralph-last-branch, ./archive) into
+# .ralph/ BEFORE archive bookkeeping, so archive_previous_run reads the migrated
+# cursor (.ralph/state.json) and detects a real branch transition. Idempotent
+# no-op on already-migrated / fresh trees. (ensure_notebook also calls this, so
+# the shim is reached even if a future caller skips this line.)
+migrate_old_layout
 archive_previous_run
 ensure_notebook
 
@@ -178,6 +202,9 @@ for i in $(seq 1 "$MAX_ITERATIONS"); do
     if echo "$AGENT_TEXT" | grep -q "<promise>${ALL_DONE_PROMISE}</promise>"; then
         echo ""
         echo "=== All stories complete! ==="
+        # Record this batch complete so a re-spin of the all-green tasks.json
+        # is refused next time (see batch_already_complete / the startup guard).
+        record_batch_complete
         log_to_notebook "done" "ralph.sh: all stories complete at iteration $i"
         break
     elif echo "$AGENT_TEXT" | grep -q "<promise>${COMPLETION_PROMISE}</promise>"; then

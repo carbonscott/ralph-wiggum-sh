@@ -9,6 +9,32 @@ Exercises both modes so you can verify the `/ralph-lnb` skill and
 
 - `tasks.json` — 2-story fixture (create `hello.txt`, append a line)
 - `setup-sandbox.sh` — scaffolds a timestamped sandbox under `$TMPDIR`
+- `prompt-diff.sh` — exit-code regression test asserting the two runners
+  (`cc-headless/ralph.sh` and `cc/ralph-prep.sh`) build byte-identical
+  prompts, and that recent history is queried before the iteration's own
+  `start` entry is logged. Run with `bash tests/prompt-diff.sh` (exits 0 on
+  pass; prints a diff and exits non-zero on divergence). Self-contained:
+  uses its own `$TMPDIR` sandboxes and needs no install.
+- `archive.sh` — drives `cc/ralph-prep.sh` to assert the `.ralph/state.json`
+  cursor, the archive-on-branch-change trigger (snapshots only `tasks.json`,
+  never the notebook), and the refuse-respin guard (an all-green recorded
+  batch is refused with exit 3 unless `--force`). Run with
+  `bash tests/archive.sh` (exits 0 on pass).
+- `concurrency.sh` — proves the per-loop writer design: two loops on different
+  branches pointed at one shared notebook each emit, concurrently, under their
+  own `ralph-<branch>` writer, landing in distinct `entries/ralph-*.jsonl`
+  files with nothing lost. Run with `bash tests/concurrency.sh` (exits 0 on
+  pass; SKIPs cleanly if `lab-notebook` is not on `$PATH`).
+- `upgrade.sh` — exercises `migrate_old_layout`, the one-time shim that moves
+  an old root-scattered install (`./.lnb`, `./.lnb.env`, `./.ralph-last-branch`,
+  `./archive/`) under `.ralph/` without data loss and is a clean no-op
+  afterwards — both in isolation and end-to-end through `cc/ralph-prep.sh`.
+  Run with `bash tests/upgrade.sh` (exits 0 on pass).
+
+Run all four at once with
+`for t in prompt-diff archive concurrency upgrade; do bash "tests/$t.sh"; done`
+(each is self-contained and exits 0 on pass; `setup-sandbox.sh` is a scaffolder,
+not a pass/fail test, so it is deliberately excluded).
 
 Prerequisite: run `../install.sh` once from the repo so `ralph` is on
 `$PATH` and `/ralph-lnb` is registered as a Claude Code skill. If you
@@ -36,7 +62,7 @@ absolute-path fallbacks you can use instead.
    ```
    cat hello.txt
    jq '.stories[].passes' tasks.json   # both should be true
-   ls .lnb/
+   ls .ralph/.lnb/
    ```
 
 ## Running headless

@@ -35,7 +35,7 @@ the end. Log whenever something meaningful happens:
 
 Command template:
 ```
-LAB_NOTEBOOK_DIR=<!-- FILL:notebook_dir --> lab-notebook emit \
+LAB_NOTEBOOK_DIR=<!-- FILL:notebook_dir --> LAB_NOTEBOOK_WRITER=<!-- FILL:writer --> lab-notebook emit \
   --context "<!-- FILL:context -->" --type <TYPE> \
   --issue "<STORY_ID>" --branch "<!-- FILL:branch -->" \
   [--files_changed "file1,file2"] [--commit "SHA"] [--pr "URL"] \

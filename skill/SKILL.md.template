@@ -2,14 +2,14 @@
 name: ralph-lnb
 description: "Run the Ralph Wiggum autonomous code loop inside a Claude Code session. Use when the user types /ralph-lnb, or says 'run ralph', 'start the ralph loop', 'keep iterating on the tasks', or asks to work through tasks.json story-by-story. Each iteration spawns a fresh subagent to complete one story and logs progress to the lab notebook."
 user-invocable: true
-argument-hint: "[max-iterations N] [task-file FILE] [prompt FILE]"
+argument-hint: "[max-iterations N] [task-file FILE] [prompt FILE] [force]"
 ---
 
 <!-- Managed by ralph-wiggum-lnb install.sh — do not edit by hand. Re-run ./install.sh from the repo to regenerate. -->
 
 # Ralph Loop — Claude Code Session Skill
 
-This skill runs the ralph loop (one story per iteration, fresh subagent each time, logs to `.lnb/`) using the `Agent()` subagent tool inside the current Claude Code chat. It is the skill-based equivalent of `@@RALPH_REPO@@/cc-headless/ralph.sh`, which spawns `claude -p` per iteration instead.
+This skill runs the ralph loop (one story per iteration, fresh subagent each time, logs to `.ralph/.lnb`) using the `Agent()` subagent tool inside the current Claude Code chat. It is the skill-based equivalent of `@@RALPH_REPO@@/cc-headless/ralph.sh`, which spawns `claude -p` per iteration instead.
 
 The ralph repo this skill was generated from lives at:
 
@@ -26,6 +26,7 @@ Parse `$ARGUMENTS` as a whitespace-separated list of `key value` pairs. Supporte
 | `max-iterations` | `10` | Safety cap on the loop |
 | `task-file` | `tasks.json` | Path to the task file (relative to cwd) |
 | `prompt` | `@@RALPH_REPO@@/shared/PROMPT.md` | Custom prompt template. Omit to use the repo's shared template. |
+| `force` | *(off)* | Bare flag (no value). Re-spin even when this branch's all-green batch was already recorded complete in `.ralph/state.json`. Bypasses the refuse-respin guard only. |
 
 Everything else gets ignored. Examples of valid argument strings:
 
@@ -33,6 +34,7 @@ Everything else gets ignored. Examples of valid argument strings:
 - `max-iterations 5`
 - `max-iterations 3 task-file sprint.json`
 - `max-iterations 5 prompt ./custom-prompt.md`
+- `force` — re-spin a batch already recorded complete
 
 ## Prerequisites (verify before starting)
 
@@ -52,7 +54,7 @@ When invoked, the main session (you) must do the following. Do not deviate, do n
 
 ### Setup
 
-1. Parse `max-iterations`, `task-file`, and `prompt` from `$ARGUMENTS`. Apply the defaults above for anything unspecified. `prompt` is optional — if the user did not supply it, leave the variable unset and omit `--prompt` from the `ralph-prep.sh` call in Loop step 1.
+1. Parse `max-iterations`, `task-file`, `prompt`, and `force` from `$ARGUMENTS`. Apply the defaults above for anything unspecified. `prompt` is optional — if the user did not supply it, leave the variable unset and omit `--prompt` from the `ralph-prep.sh` call in Loop step 1. `force` is a bare flag (it takes no value) — note whether it appeared so you can append `--force` to the `ralph-prep.sh` call in Loop step 1.
 2. Derive the notebook context once, so every subsequent log call uses the same value:
 
    ```
@@ -69,12 +71,14 @@ For `i` in `1..max-iterations`:
 1. **Build the prompt.** Call:
 
    ```
-   Bash("@@RALPH_REPO@@/cc/ralph-prep.sh --iteration i --max-iterations N --task-file <task-file>[ --prompt <prompt>]")
+   Bash("@@RALPH_REPO@@/cc/ralph-prep.sh --iteration i --max-iterations N --task-file <task-file>[ --prompt <prompt>][ --force]")
    ```
 
-   Append `--prompt <prompt>` only if the user supplied one in Setup step 1; otherwise omit the flag so `ralph-prep.sh` uses its own default (`shared/PROMPT.md`).
+   Append `--prompt <prompt>` only if the user supplied one in Setup step 1; otherwise omit the flag so `ralph-prep.sh` uses its own default (`shared/PROMPT.md`). Append `--force` only if the user passed `force` in Setup step 1.
 
-   Pass the same `N` you parsed in Setup so the start log entry records the cap alongside the iteration number (matches `cc-headless/ralph.sh`'s log format). `ralph-prep.sh` writes the filled prompt to `RALPH-PROMPT.md` in the project directory (the cwd) and prints only a one-line status to stdout — it does **not** print the prompt. Do not capture or hold the prompt; it never enters your context. Just confirm the Bash call succeeded.
+   Pass the same `N` you parsed in Setup so the start log entry records the cap alongside the iteration number (matches `cc-headless/ralph.sh`'s log format). `ralph-prep.sh` writes the filled prompt to `.ralph/prompt.md` in the project directory (the cwd) and prints only a one-line status to stdout — it does **not** print the prompt. Do not capture or hold the prompt; it never enters your context.
+
+   **Refuse-respin guard (G3):** `ralph-prep.sh` exits **3** (without writing a prompt) when this branch's batch is all-`passes:true` AND was already recorded complete in `.ralph/state.json`. On iteration 1, if the call exits 3, the batch is already finished — do **not** spawn a worker. Report its stderr message verbatim to the user and stop (skip the rest of the Loop and Post-loop). The user can re-spin with `/ralph-lnb force` (or edit `tasks.json` / start a new branch). Any other non-zero exit is a real error — report it and stop. On exit 0, confirm the Bash call succeeded and continue.
 
 2. **Spawn the worker.** Call (the prompt is a fixed string — the subagent reads the real instructions from the file):
 
@@ -82,7 +86,7 @@ For `i` in `1..max-iterations`:
    Agent(
        subagent_type="general-purpose",
        description="ralph iteration i",
-       prompt="Read ./RALPH-PROMPT.md in the current working directory and follow its instructions exactly. If that file is missing or empty, stop and report it instead of proceeding."
+       prompt="Read .ralph/prompt.md in the current working directory and follow its instructions exactly. If that file is missing or empty, stop and report it instead of proceeding."
    )
    ```
 
@@ -91,6 +95,7 @@ For `i` in `1..max-iterations`:
 3. **Check the return.** Inspect the subagent's final message. **Check `ALL_DONE` first — `<promise>ALL_DONE</promise>` contains `<promise>DONE</promise>` as a substring, so the order is load-bearing.** (Same reason `cc-headless/ralph.sh`'s grep checks `ALL_DONE` before `DONE`.)
 
    - Contains `<promise>ALL_DONE</promise>`:
+     - Record the batch complete so a later re-spin of the all-green `tasks.json` is refused (mirrors `cc-headless/ralph.sh`, which records this inline on `ALL_DONE`): `Bash("@@RALPH_REPO@@/cc/ralph-prep.sh --task-file <task-file> --record-complete")`. This writes `completed_branch` into `.ralph/state.json` and exits without prepping a prompt.
      - Call `Bash("LAB_NOTEBOOK_DIR=<notebook> lab-notebook emit --context <context> --type done --tags ralph-harness 'ralph-lnb: all stories complete at iteration i'")` using the `<context>` derived in Setup step 2.
      - Break the loop. Go to "Post-loop".
    - Contains `<promise>DONE</promise>`:
@@ -110,9 +115,9 @@ For `i` in `1..max-iterations`:
 
    Report a 3-5 sentence summary to the user covering what each story accomplished.
 
-2. If the loop ended on `max-iterations`, report: `"Hit iteration cap (N). Stopped. Check .lnb/ for progress."`
+2. If the loop ended on `max-iterations`, report: `"Hit iteration cap (N). Stopped. Check .ralph/.lnb for progress."`
 
-3. If the loop ended on a missing marker, report: `"Iteration i returned without a promise marker. Stopped. Check .lnb/ for the blocker entry and the subagent's final message."`
+3. If the loop ended on a missing marker, report: `"Iteration i returned without a promise marker. Stopped. Check .ralph/.lnb for the blocker entry and the subagent's final message."`
 
 ## Stop conditions (summary)
 
@@ -122,10 +127,10 @@ For `i` in `1..max-iterations`:
 
 ## Context budgeting
 
-The filled prompt (notebook context + full `tasks.json` + recent history) never enters the main session's context: `ralph-prep.sh` writes it to `RALPH-PROMPT.md` and the subagent reads it directly. Each iteration adds only the prep status line plus the subagent's final narration and promise marker — on the order of tens of tokens. Keep your own between-iteration narration to one short line (`"iteration i: DONE, continuing"`). Do not read `RALPH-PROMPT.md` yourself, do not summarize subagent output, do not re-read `tasks.json` yourself (`ralph-prep.sh` already folds it into the prompt file every iteration), do not print anything the user doesn't need.
+The filled prompt (notebook context + full `tasks.json` + recent history) never enters the main session's context: `ralph-prep.sh` writes it to `.ralph/prompt.md` and the subagent reads it directly. Each iteration adds only the prep status line plus the subagent's final narration and promise marker — on the order of tens of tokens. Keep your own between-iteration narration to one short line (`"iteration i: DONE, continuing"`). Do not read `.ralph/prompt.md` yourself, do not summarize subagent output, do not re-read `tasks.json` yourself (`ralph-prep.sh` already folds it into the prompt file every iteration), do not print anything the user doesn't need.
 
 ## Relationship to the headless runner
 
-The headless runner `@@RALPH_REPO@@/cc-headless/ralph.sh` shares `shared/ralph-lib.sh`, `shared/PROMPT.md`, `tasks.json`, and `.lnb/` state with this skill. A change to `shared/ralph-lib.sh` (e.g. `build_prompt`) affects both runners. `ralph-prep.sh` is used only by this skill — headless calls `build_prompt` directly and pipes the prompt to `claude -p`, whereas this skill has `ralph-prep.sh` write the prompt to `RALPH-PROMPT.md` for a fresh `Agent()` subagent to read.
+The headless runner `@@RALPH_REPO@@/cc-headless/ralph.sh` shares `shared/ralph-lib.sh`, `shared/PROMPT.md`, `tasks.json`, and `.ralph/.lnb` state with this skill. A change to `shared/ralph-lib.sh` (e.g. `build_prompt`) affects both runners. `ralph-prep.sh` is used only by this skill — headless calls `build_prompt` directly and pipes the prompt to `claude -p`, whereas this skill has `ralph-prep.sh` write the prompt to `.ralph/prompt.md` for a fresh `Agent()` subagent to read.
 
 $ARGUMENTS
