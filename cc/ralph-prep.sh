@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Per-iteration bookkeeping + prompt builder for the /ralph-lnb skill.
-# Writes the filled prompt to RALPH-PROMPT.md in the project dir and prints
+# Writes the filled prompt to .ralph/prompt.md in the project dir and prints
 # only a one-line status to stdout, so the Claude Code session can point a
 # subagent at the file without holding the prompt in its own context.
 # Diagnostics go to stderr.
@@ -10,7 +10,7 @@ set -euo pipefail
 # --- Defaults ---
 PROMPT_FILE=""
 TASK_FILE="tasks.json"
-NOTEBOOK_DIR=".lnb"
+NOTEBOOK_DIR=".ralph/.lnb"
 CONTEXT=""
 ARCHIVE_DIR="archive"
 ITERATION="1"
@@ -33,7 +33,7 @@ usage() {
 Usage: ralph-prep.sh [OPTIONS]
 
 Runs one iteration of ralph bookkeeping (archive, notebook init, history
-query, prompt fill) and writes the filled prompt to RALPH-PROMPT.md in the
+query, prompt fill) and writes the filled prompt to .ralph/prompt.md in the
 project dir, printing only a one-line status to stdout. Intended to be
 invoked by a Claude Code session that then points a subagent at that file
 via the Agent() tool — see the /ralph-lnb skill (skill/SKILL.md.template).
@@ -41,7 +41,7 @@ via the Agent() tool — see the /ralph-lnb skill (skill/SKILL.md.template).
 Options:
   --prompt FILE           Custom prompt template (default: repo's shared/PROMPT.md)
   --task-file FILE        Task file with stories (default: tasks.json)
-  --notebook DIR          Lab-notebook directory (default: .lnb)
+  --notebook DIR          Lab-notebook directory (default: .ralph/.lnb)
   --context SLUG          Notebook context (default: derived from branch)
   --archive-dir DIR       Where to archive old runs (default: archive/)
   --iteration N           Iteration number, used in the start log entry
@@ -111,17 +111,18 @@ fi
 archive_previous_run
 ensure_notebook
 
-# --- Write filled prompt to RALPH-PROMPT.md ---
+# --- Write filled prompt to .ralph/prompt.md ---
 # Query history BEFORE logging "start" so the recent_history block sees
 # only prior iterations' entries — matches cc-headless/ralph.sh ordering
 # (see ralph.sh:150-154) so both runners build byte-identical prompts.
 history=$(query_recent_history)
 
-# Write the filled prompt to RALPH-PROMPT.md in the cwd instead of stdout,
+# Write the filled prompt to .ralph/prompt.md in the cwd instead of stdout,
 # so the /ralph-lnb main agent never has to hold the full prompt in its
 # context. The subagent reads this file at the same fixed path (the skill's
-# Agent() call hardcodes ./RALPH-PROMPT.md), so anchor it to the cwd here.
-PROMPT_OUT="./RALPH-PROMPT.md"
+# Agent() call hardcodes .ralph/prompt.md), so anchor it to the cwd here.
+mkdir -p .ralph
+PROMPT_OUT=".ralph/prompt.md"
 build_prompt "$history" > "$PROMPT_OUT"
 echo "Wrote iteration $ITERATION prompt to $PROMPT_OUT"
 

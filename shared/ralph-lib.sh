@@ -41,19 +41,13 @@ archive_previous_run() {
 # --- Notebook helpers ---
 ensure_notebook() {
     if [[ ! -d "$NOTEBOOK_DIR" ]]; then
-        # lab-notebook init always creates a `.lnb` subfolder in cwd and
-        # loads the schema from --template-path directly, so no separate
-        # cp + rebuild step is needed.
-        lab-notebook init --template-path "$SHARED_DIR/coding-dev.yaml" >/dev/null
-
-        # Rename if the caller wants a non-default notebook dir, and
-        # patch .lnb.env so lab-notebook calls still find the notebook.
-        if [[ "$NOTEBOOK_DIR" != ".lnb" && -d ".lnb" && ! -d "$NOTEBOOK_DIR" ]]; then
-            mv .lnb "$NOTEBOOK_DIR"
-            if [[ -f .lnb.env ]]; then
-                sed -i.bak "s|/\\.lnb$|/$NOTEBOOK_DIR|" .lnb.env && rm -f .lnb.env.bak
-            fi
-        fi
+        # `lab-notebook init .ralph` forces a `/.lnb` leaf and writes a root
+        # .lnb.env pointing at it with an ABSOLUTE path, plus the notebook's
+        # own .gitignore — all in one call. That lands the notebook directly
+        # at .ralph/.lnb (the NOTEBOOK_DIR default), so no separate mv + sed
+        # patch of .lnb.env is needed.
+        mkdir -p .ralph
+        lab-notebook init .ralph --template-path "$SHARED_DIR/coding-dev.yaml" >/dev/null
 
         echo "Initialized notebook at $NOTEBOOK_DIR" >&2
     fi

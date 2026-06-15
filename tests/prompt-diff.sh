@@ -72,7 +72,7 @@ capture_headless_prompt() {
         local SHARED_DIR="$REPO_DIR/shared"
         local PROMPT_FILE="$SHARED_DIR/PROMPT.md"
         local TASK_FILE="tasks.json"
-        local NOTEBOOK_DIR=".lnb"
+        local NOTEBOOK_DIR=".ralph/.lnb"
         local CONTEXT=""
         local ARCHIVE_DIR="archive"
         local LAST_BRANCH_FILE=".ralph-last-branch"

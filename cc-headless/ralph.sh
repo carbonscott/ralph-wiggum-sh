@@ -5,7 +5,7 @@ set -euo pipefail
 MAX_ITERATIONS=10
 PROMPT_FILE=""
 TASK_FILE="tasks.json"
-NOTEBOOK_DIR=".lnb"
+NOTEBOOK_DIR=".ralph/.lnb"
 CONTEXT=""
 ARCHIVE_DIR="archive"
 COMPLETION_PROMISE="DONE"
@@ -34,7 +34,7 @@ Options:
   --max-iterations N      Safety cap (default: 10)
   --prompt FILE           Custom prompt template (default: repo's shared/PROMPT.md)
   --task-file FILE        Task file with stories (default: tasks.json)
-  --notebook DIR          Lab-notebook directory (default: .lnb)
+  --notebook DIR          Lab-notebook directory (default: .ralph/.lnb)
   --context SLUG          Notebook context (default: derived from branch)
   --archive-dir DIR       Where to archive old runs (default: archive/)
   -h, --help              Show this help
