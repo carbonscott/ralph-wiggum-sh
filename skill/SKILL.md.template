@@ -2,7 +2,7 @@
 name: ralph-lnb
 description: "Run the Ralph Wiggum autonomous code loop inside a Claude Code session. Use when the user types /ralph-lnb, or says 'run ralph', 'start the ralph loop', 'keep iterating on the tasks', or asks to work through tasks.json story-by-story. Each iteration spawns a fresh subagent to complete one story and logs progress to the lab notebook."
 user-invocable: true
-argument-hint: "[max-iterations N] [task-file FILE] [prompt FILE]"
+argument-hint: "[max-iterations N] [task-file FILE] [prompt FILE] [force]"
 ---
 
 <!-- Managed by ralph-wiggum-lnb install.sh — do not edit by hand. Re-run ./install.sh from the repo to regenerate. -->

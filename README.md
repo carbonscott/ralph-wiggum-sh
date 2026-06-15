@@ -74,6 +74,15 @@ customize the template. **Upgrading from an older checkout?** A stale
 it if you never customized it, or pass `--prompt ./PROMPT.md`
 explicitly if you did.
 
+On the next run, ralph also relocates any old-layout state — `./.lnb`,
+`./.ralph-last-branch`, and `./archive/` — into `.ralph/` and rewrites
+the root `.lnb.env` pointer. The move is one-time and idempotent: once
+the state lives under `.ralph/`, later runs leave it alone. If any of
+those old paths were committed to git, ralph prints a `git rm --cached
+.ralph-last-branch archive` hint — run it to drop those stale index
+entries now that their content lives under the gitignored `.ralph/`
+(ralph never runs git itself).
+
 The runner auto-initializes `.ralph/.lnb` with the coding schema on the
 first iteration — no manual `lab-notebook init` needed.
 
@@ -98,8 +107,10 @@ at session start.)
 dir. Everything ralph generates — the notebook, the per-iteration
 prompt, the batch cursor, and archived `tasks.json` snapshots — lives
 under one gitignored `.ralph/` directory, with a small `.lnb.env`
-pointer at the root so a bare `/lnb recall` finds the notebook; a reset
-is just `rm -rf .ralph/`. The prompt template, shared lib, helper
+pointer at the root so a bare `/lnb recall` finds the notebook; a full
+reset is `rm -rf .ralph/ .lnb.env` (the root pointer lives outside
+`.ralph/`, so dropping it too avoids a dangling reference until the
+next run regenerates it). The prompt template, shared lib, helper
 scripts, and notebook schema all stay in the repo and are invoked or
 sourced by `ralph` / `/ralph-lnb` (or by absolute path if you skipped
 install).
