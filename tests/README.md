@@ -42,7 +42,7 @@ absolute-path fallbacks you can use instead.
    ```
    cat hello.txt
    jq '.stories[].passes' tasks.json   # both should be true
-   ls .lnb/
+   ls .ralph/.lnb/
    ```
 
 ## Running headless

@@ -9,7 +9,7 @@ argument-hint: "[max-iterations N] [task-file FILE] [prompt FILE]"
 
 # Ralph Loop — Claude Code Session Skill
 
-This skill runs the ralph loop (one story per iteration, fresh subagent each time, logs to `.lnb/`) using the `Agent()` subagent tool inside the current Claude Code chat. It is the skill-based equivalent of `@@RALPH_REPO@@/cc-headless/ralph.sh`, which spawns `claude -p` per iteration instead.
+This skill runs the ralph loop (one story per iteration, fresh subagent each time, logs to `.ralph/.lnb`) using the `Agent()` subagent tool inside the current Claude Code chat. It is the skill-based equivalent of `@@RALPH_REPO@@/cc-headless/ralph.sh`, which spawns `claude -p` per iteration instead.
 
 The ralph repo this skill was generated from lives at:
 
@@ -115,9 +115,9 @@ For `i` in `1..max-iterations`:
 
    Report a 3-5 sentence summary to the user covering what each story accomplished.
 
-2. If the loop ended on `max-iterations`, report: `"Hit iteration cap (N). Stopped. Check .lnb/ for progress."`
+2. If the loop ended on `max-iterations`, report: `"Hit iteration cap (N). Stopped. Check .ralph/.lnb for progress."`
 
-3. If the loop ended on a missing marker, report: `"Iteration i returned without a promise marker. Stopped. Check .lnb/ for the blocker entry and the subagent's final message."`
+3. If the loop ended on a missing marker, report: `"Iteration i returned without a promise marker. Stopped. Check .ralph/.lnb for the blocker entry and the subagent's final message."`
 
 ## Stop conditions (summary)
 
@@ -131,6 +131,6 @@ The filled prompt (notebook context + full `tasks.json` + recent history) never 
 
 ## Relationship to the headless runner
 
-The headless runner `@@RALPH_REPO@@/cc-headless/ralph.sh` shares `shared/ralph-lib.sh`, `shared/PROMPT.md`, `tasks.json`, and `.lnb/` state with this skill. A change to `shared/ralph-lib.sh` (e.g. `build_prompt`) affects both runners. `ralph-prep.sh` is used only by this skill — headless calls `build_prompt` directly and pipes the prompt to `claude -p`, whereas this skill has `ralph-prep.sh` write the prompt to `.ralph/prompt.md` for a fresh `Agent()` subagent to read.
+The headless runner `@@RALPH_REPO@@/cc-headless/ralph.sh` shares `shared/ralph-lib.sh`, `shared/PROMPT.md`, `tasks.json`, and `.ralph/.lnb` state with this skill. A change to `shared/ralph-lib.sh` (e.g. `build_prompt`) affects both runners. `ralph-prep.sh` is used only by this skill — headless calls `build_prompt` directly and pipes the prompt to `claude -p`, whereas this skill has `ralph-prep.sh` write the prompt to `.ralph/prompt.md` for a fresh `Agent()` subagent to read.
 
 $ARGUMENTS
