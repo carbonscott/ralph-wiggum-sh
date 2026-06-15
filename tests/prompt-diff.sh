@@ -74,8 +74,8 @@ capture_headless_prompt() {
         local TASK_FILE="tasks.json"
         local NOTEBOOK_DIR=".ralph/.lnb"
         local CONTEXT=""
-        local ARCHIVE_DIR="archive"
-        local LAST_BRANCH_FILE=".ralph-last-branch"
+        local ARCHIVE_DIR=".ralph/archive"
+        local STATE_FILE=".ralph/state.json"
 
         # shellcheck source=/dev/null
         source "$SHARED_DIR/ralph-lib.sh"

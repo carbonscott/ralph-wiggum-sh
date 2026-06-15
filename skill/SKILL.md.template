@@ -26,6 +26,7 @@ Parse `$ARGUMENTS` as a whitespace-separated list of `key value` pairs. Supporte
 | `max-iterations` | `10` | Safety cap on the loop |
 | `task-file` | `tasks.json` | Path to the task file (relative to cwd) |
 | `prompt` | `@@RALPH_REPO@@/shared/PROMPT.md` | Custom prompt template. Omit to use the repo's shared template. |
+| `force` | *(off)* | Bare flag (no value). Re-spin even when this branch's all-green batch was already recorded complete in `.ralph/state.json`. Bypasses the refuse-respin guard only. |
 
 Everything else gets ignored. Examples of valid argument strings:
 
@@ -33,6 +34,7 @@ Everything else gets ignored. Examples of valid argument strings:
 - `max-iterations 5`
 - `max-iterations 3 task-file sprint.json`
 - `max-iterations 5 prompt ./custom-prompt.md`
+- `force` — re-spin a batch already recorded complete
 
 ## Prerequisites (verify before starting)
 
@@ -52,7 +54,7 @@ When invoked, the main session (you) must do the following. Do not deviate, do n
 
 ### Setup
 
-1. Parse `max-iterations`, `task-file`, and `prompt` from `$ARGUMENTS`. Apply the defaults above for anything unspecified. `prompt` is optional — if the user did not supply it, leave the variable unset and omit `--prompt` from the `ralph-prep.sh` call in Loop step 1.
+1. Parse `max-iterations`, `task-file`, `prompt`, and `force` from `$ARGUMENTS`. Apply the defaults above for anything unspecified. `prompt` is optional — if the user did not supply it, leave the variable unset and omit `--prompt` from the `ralph-prep.sh` call in Loop step 1. `force` is a bare flag (it takes no value) — note whether it appeared so you can append `--force` to the `ralph-prep.sh` call in Loop step 1.
 2. Derive the notebook context once, so every subsequent log call uses the same value:
 
    ```
@@ -69,12 +71,14 @@ For `i` in `1..max-iterations`:
 1. **Build the prompt.** Call:
 
    ```
-   Bash("@@RALPH_REPO@@/cc/ralph-prep.sh --iteration i --max-iterations N --task-file <task-file>[ --prompt <prompt>]")
+   Bash("@@RALPH_REPO@@/cc/ralph-prep.sh --iteration i --max-iterations N --task-file <task-file>[ --prompt <prompt>][ --force]")
    ```
 
-   Append `--prompt <prompt>` only if the user supplied one in Setup step 1; otherwise omit the flag so `ralph-prep.sh` uses its own default (`shared/PROMPT.md`).
+   Append `--prompt <prompt>` only if the user supplied one in Setup step 1; otherwise omit the flag so `ralph-prep.sh` uses its own default (`shared/PROMPT.md`). Append `--force` only if the user passed `force` in Setup step 1.
 
-   Pass the same `N` you parsed in Setup so the start log entry records the cap alongside the iteration number (matches `cc-headless/ralph.sh`'s log format). `ralph-prep.sh` writes the filled prompt to `.ralph/prompt.md` in the project directory (the cwd) and prints only a one-line status to stdout — it does **not** print the prompt. Do not capture or hold the prompt; it never enters your context. Just confirm the Bash call succeeded.
+   Pass the same `N` you parsed in Setup so the start log entry records the cap alongside the iteration number (matches `cc-headless/ralph.sh`'s log format). `ralph-prep.sh` writes the filled prompt to `.ralph/prompt.md` in the project directory (the cwd) and prints only a one-line status to stdout — it does **not** print the prompt. Do not capture or hold the prompt; it never enters your context.
+
+   **Refuse-respin guard (G3):** `ralph-prep.sh` exits **3** (without writing a prompt) when this branch's batch is all-`passes:true` AND was already recorded complete in `.ralph/state.json`. On iteration 1, if the call exits 3, the batch is already finished — do **not** spawn a worker. Report its stderr message verbatim to the user and stop (skip the rest of the Loop and Post-loop). The user can re-spin with `/ralph-lnb force` (or edit `tasks.json` / start a new branch). Any other non-zero exit is a real error — report it and stop. On exit 0, confirm the Bash call succeeded and continue.
 
 2. **Spawn the worker.** Call (the prompt is a fixed string — the subagent reads the real instructions from the file):
 
@@ -91,6 +95,7 @@ For `i` in `1..max-iterations`:
 3. **Check the return.** Inspect the subagent's final message. **Check `ALL_DONE` first — `<promise>ALL_DONE</promise>` contains `<promise>DONE</promise>` as a substring, so the order is load-bearing.** (Same reason `cc-headless/ralph.sh`'s grep checks `ALL_DONE` before `DONE`.)
 
    - Contains `<promise>ALL_DONE</promise>`:
+     - Record the batch complete so a later re-spin of the all-green `tasks.json` is refused (mirrors `cc-headless/ralph.sh`, which records this inline on `ALL_DONE`): `Bash("@@RALPH_REPO@@/cc/ralph-prep.sh --task-file <task-file> --record-complete")`. This writes `completed_branch` into `.ralph/state.json` and exits without prepping a prompt.
      - Call `Bash("LAB_NOTEBOOK_DIR=<notebook> lab-notebook emit --context <context> --type done --tags ralph-harness 'ralph-lnb: all stories complete at iteration i'")` using the `<context>` derived in Setup step 2.
      - Break the loop. Go to "Post-loop".
    - Contains `<promise>DONE</promise>`:
