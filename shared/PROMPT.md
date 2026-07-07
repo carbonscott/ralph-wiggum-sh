@@ -21,26 +21,25 @@ You are a fresh agent in a loop. Complete exactly ONE story (the first with
 `"passes": false`), then stop. Do NOT start a second story.
 
 ## Logging
-Log freely throughout your work using `lab-notebook emit`. Do not wait until
+Log freely throughout your work using `lnb note`. Do not wait until
 the end. Log whenever something meaningful happens:
 
-- **Starting a story**: `--type start --issue "US-001" "Starting work on US-001: Title"`
-- **Decided on approach**: `--type plan --issue "US-001" "Will use X approach because Y"`
-- **Made progress**: `--type impl --issue "US-001" --files_changed "a.py,b.py" "Added priority field to model"`
-- **Ran tests**: `--type test --issue "US-001" "All tests pass" or "Test X failed: reason"`
-- **Discovered a pattern**: `--type pattern --issue "US-001" "This codebase uses X for Y — future stories should follow this"`
-- **Hit a blocker**: `--type blocker --issue "US-001" "Cannot proceed because X"`
-- **Abandoning approach**: `--type dead-end --issue "US-001" "Tried X, failed because Y"`
-- **Completed story**: `--type done --issue "US-001" --commit "abc123" "All criteria met, committed"`
+- **Starting a story**: `lnb note "Starting work on US-001: Title" +start issue=US-001`
+- **Decided on approach**: `lnb note "Will use X approach because Y" +plan issue=US-001`
+- **Made progress**: `lnb note "Added priority field to model" +impl issue=US-001 files_changed=a.py,b.py`
+- **Ran tests**: `lnb note "All tests pass" +test issue=US-001` (or `"Test X failed: reason"`)
+- **Discovered a pattern**: `lnb note "This codebase uses X for Y — future stories should follow this" +pattern issue=US-001`
+- **Hit a blocker**: `lnb note "Cannot proceed because X" +blocker issue=US-001`
+- **Abandoning approach**: `lnb note "Tried X, failed because Y" +dead-end issue=US-001`
+- **Completed story**: `lnb note "All criteria met, committed" +done issue=US-001 commit=abc123`
 
-Command template:
+Command template (content LEADS; `+TYPE`/`@context` are sigils, everything else is `key=value`):
 ```
-LAB_NOTEBOOK_DIR=<!-- FILL:notebook_dir --> LAB_NOTEBOOK_WRITER=<!-- FILL:writer --> lab-notebook emit \
-  --context "<!-- FILL:context -->" --type <TYPE> \
-  --issue "<STORY_ID>" --branch "<!-- FILL:branch -->" \
-  [--files_changed "file1,file2"] [--commit "SHA"] [--pr "URL"] \
-  --tags "<relevant,tags>" \
-  "<what happened>"
+LNB_DIR=<!-- FILL:notebook_dir --> LNB_WRITER=<!-- FILL:writer --> lnb note \
+  "<what happened>" +<TYPE> @<!-- FILL:context --> \
+  issue=<STORY_ID> branch=<!-- FILL:branch --> \
+  [files_changed=file1,file2] [commit=SHA] [pr=URL] \
+  tags=<relevant,tags>
 ```
 
 Pattern entries are especially valuable — they persist across iterations and
@@ -59,32 +58,32 @@ notebook has the *reasoning, failures, and patterns* behind them.
 - "Was this story started but not finished?" → check for interrupted work
 - "What files were involved in a related story?" → check impl entries
 
-Query command:
+Query command (`lnb log` streams every record as JSONL, ascending by ts; jq is the read path):
 ```
-LAB_NOTEBOOK_DIR=<!-- FILL:notebook_dir --> lab-notebook sql "<SQL>"
+LNB_DIR=<!-- FILL:notebook_dir --> lnb log | jq '<filter>'
 ```
 
 Examples:
-```sql
--- Avoid repeating failed approaches
-SELECT content FROM entries WHERE context='<!-- FILL:context -->' AND type='dead-end' AND issue='US-001'
+```bash
+# Avoid repeating failed approaches
+lnb log | jq -r --arg c '<!-- FILL:context -->' 'select(.context==$c and .type=="dead-end" and .issue=="US-001").content'
 
--- Learn patterns discovered by prior agents
-SELECT content FROM entries WHERE context='<!-- FILL:context -->' AND type='pattern' ORDER BY ts
+# Learn patterns discovered by prior agents (log is already ascending by ts)
+lnb log | jq -r --arg c '<!-- FILL:context -->' 'select(.context==$c and .type=="pattern").content'
 
--- Find interrupted work to resume
-SELECT e.issue, e.content FROM entries e WHERE context='<!-- FILL:context -->' AND type='start' AND issue NOT IN (SELECT issue FROM entries WHERE context='<!-- FILL:context -->' AND type='done')
+# Find interrupted work to resume (a start with no matching done)
+lnb log | jq -s --arg c '<!-- FILL:context -->' '[.[]|select(.context==$c and .type=="done").issue] as $d | .[] | select(.context==$c and .type=="start" and (.issue|IN($d[])|not)) | {issue,content}'
 
--- Check what files were changed for a related story
-SELECT ts, type, content FROM entries WHERE context='<!-- FILL:context -->' AND files_changed LIKE '%auth.py%'
+# Check what files were changed for a related story
+lnb log | jq -c --arg c '<!-- FILL:context -->' 'select(.context==$c and ((.files_changed//"")|test("auth\\.py"))) | {ts,type,content}'
 
--- Free-text search across all entries
-SELECT ts, type, substr(content,1,200) FROM entries e JOIN entries_fts f ON f.rowid = e.rowid WHERE entries_fts MATCH 'migration'
+# Free-text search across all entries
+lnb log | jq -c 'select((.content//"")|test("migration")) | {ts,type,content:(.content[0:200])}'
 ```
 
-You are not limited to these examples. The entries table has columns:
-`ts, type, issue, content, branch, tags, files_changed, commit, pr`.
-Compose any query you need.
+You are not limited to these examples. Each record is a JSON object with keys
+`ts, type, issue, content, branch, tags, files_changed, commit, pr, writer, context, id`;
+compose any jq filter over `lnb log`.
 
 ## Each Iteration
 

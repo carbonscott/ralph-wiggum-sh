@@ -46,7 +46,7 @@ Everything else gets ignored. Examples of valid argument strings:
    path to `ralph-prep.sh` on every iteration (see Loop step 1). Do
    not pre-check the file — `ralph-prep.sh` validates it on iteration
    1 and errors cleanly if missing.
-4. `jq` and `lab-notebook` must be on `$PATH`. If missing, tell the user and stop.
+4. `jq` and `lnb` must be on `$PATH`. If missing, tell the user and stop.
 
 ## Procedure
 
@@ -96,13 +96,13 @@ For `i` in `1..max-iterations`:
 
    - Contains `<promise>ALL_DONE</promise>`:
      - Record the batch complete so a later re-spin of the all-green `tasks.json` is refused (mirrors `cc-headless/ralph.sh`, which records this inline on `ALL_DONE`): `Bash("@@RALPH_REPO@@/cc/ralph-prep.sh --task-file <task-file> --record-complete")`. This writes `completed_branch` into `.ralph/state.json` and exits without prepping a prompt.
-     - Call `Bash("LAB_NOTEBOOK_DIR=<notebook> lab-notebook emit --context <context> --type done --tags ralph-harness 'ralph-lnb: all stories complete at iteration i'")` using the `<context>` derived in Setup step 2.
+     - Call `Bash("LNB_DIR=<notebook> lnb note 'ralph-lnb: all stories complete at iteration i' +done --context <context> tags=ralph-harness")` using the `<context>` derived in Setup step 2.
      - Break the loop. Go to "Post-loop".
    - Contains `<promise>DONE</promise>`:
      - Say exactly: `"iteration i: DONE, continuing"`. One line.
      - Continue to next iteration.
    - Neither marker:
-     - Call `Bash(...)` to log a blocker entry (same shape as above but `--type blocker` and `"ralph-lnb: iteration i ended without promise"`).
+     - Call `Bash(...)` to log a blocker entry (same shape as above but `+blocker` and `'ralph-lnb: iteration i ended without promise'`).
      - Break the loop. Go to "Post-loop".
 
 ### Post-loop
@@ -110,7 +110,7 @@ For `i` in `1..max-iterations`:
 1. If the loop ended on `ALL_DONE`, optionally query the notebook for a summary, using the `<context>` derived in Setup step 2:
 
    ```
-   Bash("LAB_NOTEBOOK_DIR=<notebook> lab-notebook sql \"SELECT ts, type, issue, substr(content,1,200) FROM entries WHERE context='<context>' AND type IN ('start','done','impl','blocker') ORDER BY ts\"")
+   Bash("LNB_DIR=<notebook> lnb log | jq -c --arg c '<context>' 'select(.context==$c and (.type|IN(\"start\",\"done\",\"impl\",\"blocker\"))) | {ts,type,issue,content:(.content[0:200])}'")
    ```
 
    Report a 3-5 sentence summary to the user covering what each story accomplished.

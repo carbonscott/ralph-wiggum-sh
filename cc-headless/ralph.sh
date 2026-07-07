@@ -29,7 +29,7 @@ Usage: ralph.sh [OPTIONS]
 
 Autonomous agent loop for code development tasks.
 Spawns a fresh Claude instance per iteration, tracking state via a task
-file (tasks.json) and a lab-notebook.
+file (tasks.json) and an lnb notebook.
 
 Options:
   --max-iterations N      Safety cap (default: 10)
