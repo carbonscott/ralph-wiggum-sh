@@ -24,7 +24,7 @@ Exercises both modes so you can verify the `/ralph-lnb` skill and
   branches pointed at one shared notebook each emit, concurrently, under their
   own `ralph-<branch>` writer, landing in distinct `entries/ralph-*.jsonl`
   files with nothing lost. Run with `bash tests/concurrency.sh` (exits 0 on
-  pass; SKIPs cleanly if `lab-notebook` is not on `$PATH`).
+  pass; SKIPs cleanly if `lnb` is not on `$PATH`).
 - `upgrade.sh` — exercises `migrate_old_layout`, the one-time shim that moves
   an old root-scattered install (`./.lnb`, `./.lnb.env`, `./.ralph-last-branch`,
   `./archive/`) under `.ralph/` without data loss and is a clean no-op
@@ -85,7 +85,7 @@ Sandboxes are timestamped, so old runs are never overwritten.
 
 ## Gotchas
 
-- Needs `jq` and `lab-notebook` on `$PATH` (same prerequisites as
+- Needs `jq` and `lnb` on `$PATH` (same prerequisites as
   ralph itself).
 - The sandbox only contains `tasks.json`. The runners pick up
   `shared/PROMPT.md` from the repo automatically, and all helper

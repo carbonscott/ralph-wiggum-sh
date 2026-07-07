@@ -1,31 +1,39 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# One-time OLD-layout -> .ralph/ upgrade shim test (handoff 08).
+# One-time OLD-layout -> .ralph/ upgrade shim test (handoff 08), reworked for
+# the minimal `lnb` CLI.
 #
-# Older installs scattered ralph state across the project root:
-#   ./.lnb/              notebook         -> .ralph/.lnb
-#   ./.lnb.env           pointer (abs)    -> rewritten to point at .ralph/.lnb
-#   ./.ralph-last-branch bare branch cur. -> .ralph/state.json
-#   ./archive/           old snapshots    -> .ralph/archive
+# WHAT WAS REMOVED AND WHY:
+#   The pre-min harness used the old lab notebook CLI, which had an `init` step
+#   and a project-local `.lnb.env` pointer file (an exported absolute-path env
+#   line) that migrate_old_layout had to create/rewrite/reconcile. The minimal
+#   `lnb` CLI has NEITHER: there is no `init` (a notebook dir auto-creates on
+#   the first `lnb note`) and no `.lnb.env` (discovery is `$LNB_DIR`, else the
+#   nearest `.lnb/` walking up). So every assertion about `.lnb.env`
+#   content/format, the exported pointer line, pointer reconciliation
+#   (dangling-pointer repair, discovery-via-.lnb.env), the both-notebooks-exist
+#   warning, and the old `init` layout has been DELETED — it tests machinery
+#   that no longer exists. The end-to-end PART B through cc/ralph-prep.sh was
+#   also dropped: its distinctive value (a migrated cursor drives a transition
+#   archive) is already covered by tests/archive.sh, and its remaining
+#   assertions were dominated by the removed `.lnb.env`/init machinery.
 #
-# migrate_old_layout migrates such a tree ONCE without data loss and is a clean
-# no-op afterwards. Both runners call it (before archive bookkeeping, and again
-# at the top of ensure_notebook). This test exercises it two ways:
+# WHAT REMAINS TESTED (the surviving, still-meaningful properties of
+# migrate_old_layout in shared/ralph-lib.sh):
+#   (a) the notebook dir MOVE (./.lnb -> .ralph/.lnb) preserves entries — the
+#       pre-move records are still returned by `lnb log` afterward;
+#   (b) the branch cursor ./.ralph-last-branch -> .ralph/state.json (carrying
+#       the OLD branch verbatim, in the landed schema);
+#   (c) ./archive -> .ralph/archive with its snapshot intact;
+#   (d) the OLD root files are removed;
+#   (e) a SECOND migrate is a clean no-op (idempotence): no re-move, entry
+#       intact;
+#   (f) a half-migrated tree converges: an already-moved notebook is NOT
+#       re-moved (no data loss) while lingering cursor + archive complete.
 #
-#   PART A — the shim in isolation (source ralph-lib.sh, call migrate_old_layout
-#   directly): proves the precise migration outcome, incl. that state.json
-#   carries the OLD branch verbatim, and that a SECOND call is a clean no-op
-#   (idempotence) and a half-migrated tree converges.
-#
-#   PART B — end-to-end through cc/ralph-prep.sh (the runnable bookkeeping entry
-#   point — reaches migrate_old_layout + archive_previous_run + ensure_notebook
-#   without needing `claude`): proves a real run migrates the layout, then the
-#   migrated OLD branch drives archive_previous_run to snapshot under an
-#   old-branch-named archive folder, and a second run is a clean no-op.
-#
-# Everything runs in plain NON-GIT dirs (ralph is git-optional; nothing here
-# invokes git).
+# migrate_old_layout MUST NOT invoke git (ralph is git-optional and must work
+# in a plain non-git dir); this test runs entirely in non-git dirs.
 #
 # Mechanics (mirrors tests/archive.sh / tests/setup-sandbox.sh):
 #   - Resolve the repo via BASH_SOURCE, never `which ralph` (the installed
@@ -33,12 +41,10 @@ set -euo pipefail
 #   - Throwaway $TMPDIR workroot; clean up on exit.
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PREP="$REPO_DIR/cc/ralph-prep.sh"
 SHARED_DIR="$REPO_DIR/shared"
-TEMPLATE="$SHARED_DIR/coding-dev.yaml"
 
-if ! command -v lab-notebook &>/dev/null; then
-    echo "SKIP: lab-notebook not on PATH; cannot run upgrade test." >&2
+if ! command -v lnb &>/dev/null; then
+    echo "SKIP: lnb not on PATH; cannot run upgrade test." >&2
     exit 0
 fi
 
@@ -55,34 +61,41 @@ KNOWN_ENTRY="known entry alpha (pre-migration)"
 OLD_BRANCH="ralph/old-batch"
 ARCHIVE_SNAPSHOT_REL="archive/2025-01-01-old-batch/tasks.json"
 
-# seed_old_layout <dir>: scaffold a full OLD-layout project at <dir>.
-#   ./.lnb (+ ./.lnb.env) with ONE known entry, ./.ralph-last-branch, ./archive.
+# entry_present <lnb-dir>: 0 iff KNOWN_ENTRY is returned by `lnb log` there.
+# `lnb log` streams JSONL (one record per line); jq slurps and checks any match.
+entry_present() {
+    LNB_DIR="$1" lnb log 2>/dev/null \
+        | jq -e -s --arg e "$KNOWN_ENTRY" 'any(.[]; .content == $e)' >/dev/null
+}
+
+# seed_old_layout <dir>: scaffold a full OLD-layout project at <dir>:
+#   ./.lnb (with ONE known entry), ./.ralph-last-branch, ./archive/<snapshot>.
+# The min CLI has no init and no .lnb.env: the notebook is created simply by
+# writing one entry into ./.lnb via `lnb note`.
 seed_old_layout() {
     local dir="$1"
     mkdir -p "$dir"
     cp "$REPO_DIR/tests/tasks.json" "$dir/tasks.json"
     (
         cd "$dir"
-        # `lab-notebook init .` forces a /.lnb leaf and writes ./.lnb.env with an
-        # ABSOLUTE path to it — exactly the OLD on-disk shape.
-        lab-notebook init . --template-path "$TEMPLATE" >/dev/null
-        LAB_NOTEBOOK_DIR="$dir/.lnb" \
-            lab-notebook emit --context "$OLD_BRANCH" --type impl "$KNOWN_ENTRY" >/dev/null
+        # First `lnb note` auto-creates ./.lnb and appends the known entry.
+        LNB_DIR="$dir/.lnb" \
+            lnb note "$KNOWN_ENTRY" --type impl --context "$OLD_BRANCH" >/dev/null
         printf '%s\n' "$OLD_BRANCH" > ./.ralph-last-branch
         mkdir -p "$(dirname "$ARCHIVE_SNAPSHOT_REL")"
         printf 'old snapshot marker\n' > "$ARCHIVE_SNAPSHOT_REL"
     )
-    [[ -d "$dir/.lnb" && -f "$dir/.lnb.env" && -f "$dir/.ralph-last-branch" \
+    [[ -d "$dir/.lnb" && -f "$dir/.ralph-last-branch" \
         && -f "$dir/$ARCHIVE_SNAPSHOT_REL" ]] || fail "seed: OLD layout incomplete in $dir"
 }
 
 ###############################################################################
-echo "== PART A: migrate_old_layout in isolation =="
+echo "== migrate_old_layout in isolation =="
 ###############################################################################
 A_DIR="$WORKROOT/partA"
 seed_old_layout "$A_DIR"
 [[ ! -d "$A_DIR/.git" ]] || fail "partA sandbox unexpectedly has .git"
-pass "seeded OLD layout (./.lnb + 1 entry, ./.lnb.env, ./.ralph-last-branch=$OLD_BRANCH, $ARCHIVE_SNAPSHOT_REL)"
+pass "seeded OLD layout (./.lnb + 1 entry, ./.ralph-last-branch=$OLD_BRANCH, $ARCHIVE_SNAPSHOT_REL)"
 
 # Drive the real shim, isolated in a subshell so the sourced lib/vars don't leak.
 (
@@ -93,13 +106,11 @@ pass "seeded OLD layout (./.lnb + 1 entry, ./.lnb.env, ./.ralph-last-branch=$OLD
     migrate_old_layout
 )
 
-# (a) Known entry queryable through .ralph/.lnb.
+# (a) Known entry survives the MOVE and is returned by `lnb log` at .ralph/.lnb.
 [[ -d "$A_DIR/.ralph/.lnb" ]] || fail "A: .ralph/.lnb not present after migrate"
-got=$(LAB_NOTEBOOK_DIR="$A_DIR/.ralph/.lnb" lab-notebook sql \
-    "SELECT content FROM entries WHERE content='$KNOWN_ENTRY'" 2>/dev/null || true)
-echo "$got" | grep -qF "$KNOWN_ENTRY" \
-    || fail "A: known entry NOT queryable through .ralph/.lnb (history lost!); got: $got"
-pass "known entry survives the MOVE and is queryable through .ralph/.lnb"
+entry_present "$A_DIR/.ralph/.lnb" \
+    || fail "A: known entry NOT returned by lnb log through .ralph/.lnb (history lost!)"
+pass "known entry survives the MOVE and is returned by lnb log through .ralph/.lnb"
 
 # (b) state.json carries the OLD branch verbatim and is schema-valid.
 SF="$A_DIR/.ralph/state.json"
@@ -123,30 +134,16 @@ grep -q "old snapshot marker" "$A_DIR/.ralph/$ARCHIVE_SNAPSHOT_REL" \
     || fail "A: archive snapshot content lost"
 pass "./archive moved to .ralph/archive with snapshot intact"
 
-# (d) Old root files gone; .lnb.env repointed to the new ABSOLUTE export path.
+# (d) Old root files gone.
 [[ ! -e "$A_DIR/.lnb" ]]               || fail "A: old ./.lnb still present"
 [[ ! -e "$A_DIR/.ralph-last-branch" ]] || fail "A: old ./.ralph-last-branch still present"
 [[ ! -e "$A_DIR/archive" ]]            || fail "A: old ./archive still present"
-NEW_ABS="$A_DIR/.ralph/.lnb"
-env_val=$(sed -n 's/^[[:space:]]*\(export[[:space:]]\+\)\?LAB_NOTEBOOK_DIR=//p' "$A_DIR/.lnb.env" | head -1)
-[[ "$env_val" == "$NEW_ABS" ]] \
-    || fail "A: .lnb.env LAB_NOTEBOOK_DIR is '$env_val', expected absolute '$NEW_ABS'"
-grep -q '^export LAB_NOTEBOOK_DIR=' "$A_DIR/.lnb.env" \
-    || fail "A: .lnb.env not in 'export LAB_NOTEBOOK_DIR=...' init format"
-pass "old root files gone; .lnb.env -> $NEW_ABS (absolute, export format)"
+pass "old root files gone (./.lnb, ./.ralph-last-branch, ./archive)"
 
-# (e) Discovery via .lnb.env (no explicit env var) resolves the migrated notebook.
-disc=$(cd "$A_DIR" && lab-notebook sql \
-    "SELECT content FROM entries WHERE content='$KNOWN_ENTRY'" 2>/dev/null || true)
-echo "$disc" | grep -qF "$KNOWN_ENTRY" \
-    || fail "A: discovery via .lnb.env broken (entry not found); got: $disc"
-pass "notebook discovery via .lnb.env resolves the migrated notebook"
-
-# (f) Idempotence: a SECOND migrate_old_layout is a clean no-op.
-snapshot() { ( cd "$A_DIR" && find .ralph .lnb.env -printf '%P\t%s\t%T@\n' 2>/dev/null | sort ); }
-before=$(snapshot)
-env_before=$(cat "$A_DIR/.lnb.env")
-state_before=$(cat "$SF")
+# (e) Idempotence: a SECOND migrate_old_layout is a clean no-op. No "Migrated"
+#     lines, the migrated notebook is NOT re-moved (its inode is stable — a
+#     re-move would change it), and the entry is still queryable.
+nb_inode_before=$(stat -c '%i' "$A_DIR/.ralph/.lnb")
 A2LOG="$WORKROOT/partA-run2.log"
 (
     cd "$A_DIR"
@@ -156,24 +153,23 @@ A2LOG="$WORKROOT/partA-run2.log"
     migrate_old_layout
 ) >"$A2LOG" 2>&1
 grep -qi 'Migrated ' "$A2LOG" && fail "A: second migrate re-migrated (not idempotent): $(cat "$A2LOG")"
-[[ "$(snapshot)" == "$before" ]] || { diff <(printf '%s\n' "$before") <(printf '%s\n' "$(snapshot)") >&2; fail "A: second migrate mutated the .ralph tree"; }
-[[ "$(cat "$A_DIR/.lnb.env")" == "$env_before" ]] || fail "A: second migrate changed .lnb.env"
-[[ "$(cat "$SF")" == "$state_before" ]] || fail "A: second migrate changed state.json"
-pass "second migrate_old_layout is a CLEAN no-op (no Migrated lines; tree/.lnb.env/state unchanged)"
+[[ "$(stat -c '%i' "$A_DIR/.ralph/.lnb")" == "$nb_inode_before" ]] \
+    || fail "A: .ralph/.lnb was re-moved on second migrate (inode changed)"
+entry_present "$A_DIR/.ralph/.lnb" || fail "A: known entry lost after no-op second migrate"
+pass "second migrate_old_layout is a CLEAN no-op (no Migrated lines; notebook not re-moved; entry intact)"
 
-# (g) Partial-migration convergence: a tree where the notebook is migrated but
-#     the OLD cursor + archive linger must converge without clobbering the
-#     already-migrated notebook (and without erroring under set -euo pipefail).
+# (f) Partial-migration convergence: a tree where the notebook is ALREADY moved
+#     but the OLD cursor + archive linger must converge without re-moving (and
+#     so without clobbering) the already-migrated notebook, and without erroring
+#     under set -euo pipefail.
 P_DIR="$WORKROOT/partial"
 seed_old_layout "$P_DIR"
-# Simulate an interrupted migration: notebook already moved (+ pointer fixed),
-# but ./.ralph-last-branch and ./archive still at root and no state.json yet.
+# Simulate an interrupted migration: notebook already moved, but
+# ./.ralph-last-branch and ./archive still at root and no state.json yet.
 mkdir -p "$P_DIR/.ralph"
 mv "$P_DIR/.lnb" "$P_DIR/.ralph/.lnb"
-printf '# Project-local lab-notebook configuration\nexport LAB_NOTEBOOK_DIR=%s\n' \
-    "$P_DIR/.ralph/.lnb" > "$P_DIR/.lnb.env"
-# Mark the already-migrated notebook so we can prove it is NOT clobbered.
-P_NB_MTIME_BEFORE=$(stat -c '%Y' "$P_DIR/.ralph/.lnb")
+# Mark the already-migrated notebook so we can prove it is NOT re-moved.
+P_NB_INODE_BEFORE=$(stat -c '%i' "$P_DIR/.ralph/.lnb")
 (
     cd "$P_DIR"
     STATE_FILE=".ralph/state.json"
@@ -182,11 +178,9 @@ P_NB_MTIME_BEFORE=$(stat -c '%Y' "$P_DIR/.ralph/.lnb")
     migrate_old_layout
 )
 # Notebook must be untouched (no re-move / re-init); its entry still queryable.
-gotp=$(LAB_NOTEBOOK_DIR="$P_DIR/.ralph/.lnb" lab-notebook sql \
-    "SELECT content FROM entries WHERE content='$KNOWN_ENTRY'" 2>/dev/null || true)
-echo "$gotp" | grep -qF "$KNOWN_ENTRY" || fail "partial: notebook clobbered (entry lost)"
-[[ "$(stat -c '%Y' "$P_DIR/.ralph/.lnb")" == "$P_NB_MTIME_BEFORE" ]] \
-    || fail "partial: .ralph/.lnb was re-moved (mtime changed) despite already being migrated"
+entry_present "$P_DIR/.ralph/.lnb" || fail "partial: notebook clobbered (entry lost)"
+[[ "$(stat -c '%i' "$P_DIR/.ralph/.lnb")" == "$P_NB_INODE_BEFORE" ]] \
+    || fail "partial: .ralph/.lnb was re-moved (inode changed) despite already being migrated"
 # The lingering OLD cursor + archive must now be converged.
 [[ "$(jq -r '.branch' "$P_DIR/.ralph/state.json")" == "$OLD_BRANCH" ]] \
     || fail "partial: cursor not converged from lingering ./.ralph-last-branch"
@@ -195,135 +189,13 @@ echo "$gotp" | grep -qF "$KNOWN_ENTRY" || fail "partial: notebook clobbered (ent
 [[ ! -e "$P_DIR/archive" ]] || fail "partial: ./archive not removed"
 pass "partial-migration tree converges: notebook untouched, cursor + archive completed"
 
-# (h) Dangling-pointer reconciliation: an interrupted run moved ./.lnb ->
-#     .ralph/.lnb but died BEFORE rewriting .lnb.env, leaving the pointer at the
-#     now-missing ./.lnb. A later migrate must repoint it at .ralph/.lnb so a
-#     bare discovery (no explicit env var) still resolves the notebook.
-H_DIR="$WORKROOT/dangling"
-seed_old_layout "$H_DIR"
-OLD_ABS_LNB="$H_DIR/.lnb"
-mkdir -p "$H_DIR/.ralph"
-mv "$H_DIR/.lnb" "$H_DIR/.ralph/.lnb"
-# Pointer left dangling at the OLD absolute path (the interrupted-move bug).
-printf '# Project-local lab-notebook configuration\nexport LAB_NOTEBOOK_DIR=%s\n' \
-    "$OLD_ABS_LNB" > "$H_DIR/.lnb.env"
-[[ ! -d "$OLD_ABS_LNB" ]] || fail "h: precondition — old ./.lnb should be gone"
-(
-    cd "$H_DIR"
-    STATE_FILE=".ralph/state.json"
-    # shellcheck source=/dev/null
-    source "$SHARED_DIR/ralph-lib.sh"
-    migrate_old_layout
-)
-H_ABS="$H_DIR/.ralph/.lnb"
-h_env=$(sed -n 's/^[[:space:]]*\(export[[:space:]]\+\)\?LAB_NOTEBOOK_DIR=//p' "$H_DIR/.lnb.env" | head -1)
-[[ "$h_env" == "$H_ABS" ]] \
-    || fail "h: dangling pointer not reconciled; .lnb.env is '$h_env', expected '$H_ABS'"
-hdisc=$(cd "$H_DIR" && lab-notebook sql \
-    "SELECT content FROM entries WHERE content='$KNOWN_ENTRY'" 2>/dev/null || true)
-echo "$hdisc" | grep -qF "$KNOWN_ENTRY" \
-    || fail "h: discovery via reconciled .lnb.env broken; got: $hdisc"
-pass "dangling .lnb.env pointer reconciled to .ralph/.lnb after an interrupted move"
-
-# (i) Both-notebooks-exist: a stale ./.lnb lingering alongside an already-migrated
-#     .ralph/.lnb must be LEFT IN PLACE (never deleted/merged) with a loud warning
-#     — silent orphaning of the old history is the failure mode being guarded.
-I_DIR="$WORKROOT/bothexist"
-seed_old_layout "$I_DIR"
-mkdir -p "$I_DIR/.ralph"
-cp -a "$I_DIR/.lnb" "$I_DIR/.ralph/.lnb"   # already-migrated copy present...
-[[ -d "$I_DIR/.lnb" && -d "$I_DIR/.ralph/.lnb" ]] \
-    || fail "i: precondition — both notebooks should exist"   # ...and ./.lnb still lingers
-ILOG="$WORKROOT/bothexist.log"
-(
-    cd "$I_DIR"
-    STATE_FILE=".ralph/state.json"
-    # shellcheck source=/dev/null
-    source "$SHARED_DIR/ralph-lib.sh"
-    migrate_old_layout
-) >"$ILOG" 2>&1
-grep -qiF 'both ./.lnb and .ralph/.lnb exist' "$ILOG" \
-    || fail "i: expected a both-exist WARNING; got: $(cat "$ILOG")"
-[[ -d "$I_DIR/.lnb" ]] \
-    || fail "i: stale ./.lnb was destroyed (history must be preserved, not deleted)"
-[[ -d "$I_DIR/.ralph/.lnb" ]] || fail "i: .ralph/.lnb disturbed"
-pass "both-notebooks-exist: ./.lnb preserved untouched with a loud warning (no silent data loss)"
-
-###############################################################################
-echo "== PART B: end-to-end through cc/ralph-prep.sh =="
-###############################################################################
-B_DIR="$WORKROOT/partB"
-seed_old_layout "$B_DIR"
-[[ ! -d "$B_DIR/.git" ]] || fail "partB sandbox unexpectedly has .git"
-cd "$B_DIR"
-
-# Run 1: migrate, then archive_previous_run sees the migrated OLD branch as the
-# cursor and the CURRENT tasks.json branch (ralph/smoke-test) as a transition.
-BLOG1="$WORKROOT/partB-run1.log"
-"$PREP" --task-file tasks.json --iteration 1 >"$BLOG1" 2>&1 \
-    || fail "B run 1 exited non-zero: $(cat "$BLOG1")"
-
-# The shim reported the migration.
-grep -qi 'Migrated notebook' "$BLOG1" || fail "B: run 1 did not report notebook migration: $(cat "$BLOG1")"
-
-# Notebook history survived end-to-end.
-gotb=$(LAB_NOTEBOOK_DIR="$B_DIR/.ralph/.lnb" lab-notebook sql \
-    "SELECT content FROM entries WHERE content='$KNOWN_ENTRY'" 2>/dev/null || true)
-echo "$gotb" | grep -qF "$KNOWN_ENTRY" || fail "B: known entry lost end-to-end"
-
-# Old root files gone; .lnb.env repointed.
-[[ ! -e ./.lnb && ! -e ./.ralph-last-branch && ! -e ./archive ]] \
-    || fail "B: old root artifacts not removed (ls: $(ls -a))"
-NEW_ABS_B="$B_DIR/.ralph/.lnb"
-env_val_b=$(sed -n 's/^[[:space:]]*\(export[[:space:]]\+\)\?LAB_NOTEBOOK_DIR=//p' ./.lnb.env | head -1)
-[[ "$env_val_b" == "$NEW_ABS_B" ]] || fail "B: .lnb.env -> '$env_val_b', expected '$NEW_ABS_B'"
-
-# The migrated OLD branch drove archive_previous_run: a transition from
-# ralph/old-batch to ralph/smoke-test snapshots tasks.json under an
-# old-branch-named folder. (branch_slug strips 'ralph/' -> 'old-batch'.)
-DATE_STR="$(date +%Y-%m-%d)"
-TRANS_FOLDER=".ralph/archive/$DATE_STR-old-batch"
-[[ -f "$TRANS_FOLDER/tasks.json" ]] \
-    || fail "B: migrated OLD branch did not drive a transition archive at $TRANS_FOLDER (have: $(ls -R .ralph/archive 2>/dev/null))"
-# The pre-existing OLD snapshot also still lives under .ralph/archive.
-[[ -f ".ralph/$ARCHIVE_SNAPSHOT_REL" ]] || fail "B: pre-existing OLD snapshot lost from archive"
-# After the transition, the cursor advanced to the current branch.
-[[ "$(jq -r '.branch' .ralph/state.json)" == "ralph/smoke-test" ]] \
-    || fail "B: cursor did not advance to ralph/smoke-test after transition"
-pass "run 1: migrated; OLD branch drove a transition archive ($TRANS_FOLDER); cursor advanced"
-
-# Run 2: clean no-op for the shim. The migration is idempotent: no "Migrated"
-# lines, no old artifacts reappear, the .lnb.env pointer the shim wrote is
-# byte-identical, and the migrated notebook is NOT re-moved (its inode is
-# stable — a re-move would change it). We do NOT assert the whole notebook tree
-# is byte-stable: ralph-prep legitimately emits a `start` entry + rebuilds the
-# index every run; that's normal notebook activity, not the shim.
-nb_inode_before=$(stat -c '%i' .ralph/.lnb)
-env_b2_before=$(cat ./.lnb.env)
-BLOG2="$WORKROOT/partB-run2.log"
-"$PREP" --task-file tasks.json --iteration 2 >"$BLOG2" 2>&1 \
-    || fail "B run 2 exited non-zero: $(cat "$BLOG2")"
-grep -qi 'Migrated ' "$BLOG2" && fail "B: run 2 re-migrated (shim not idempotent): $(grep -i 'Migrated ' "$BLOG2")"
-[[ ! -e ./.lnb && ! -e ./.ralph-last-branch && ! -e ./archive ]] \
-    || fail "B: old artifacts reappeared on run 2"
-[[ "$(stat -c '%i' .ralph/.lnb)" == "$nb_inode_before" ]] \
-    || fail "B: .ralph/.lnb was re-moved on run 2 (inode changed)"
-[[ "$(cat ./.lnb.env)" == "$env_b2_before" ]] || fail "B: .lnb.env changed on run 2"
-# Same-branch run created no NEW transition folder.
-NEW_TRANS=$(find .ralph/archive -maxdepth 1 -type d -name "$DATE_STR-smoke-test" 2>/dev/null)
-[[ -z "$NEW_TRANS" ]] || fail "B: same-branch run 2 created a spurious archive: $NEW_TRANS"
-gotb2=$(LAB_NOTEBOOK_DIR="$B_DIR/.ralph/.lnb" lab-notebook sql \
-    "SELECT content FROM entries WHERE content='$KNOWN_ENTRY'" 2>/dev/null || true)
-echo "$gotb2" | grep -qF "$KNOWN_ENTRY" || fail "B: known entry lost after no-op run 2"
-pass "run 2 is a clean no-op: no re-migration, shim files + .lnb.env unchanged, entry intact"
-
 ###############################################################################
 echo "== No git was invoked anywhere (git-optional) =="
 ###############################################################################
-for d in "$A_DIR" "$P_DIR" "$B_DIR"; do
+for d in "$A_DIR" "$P_DIR"; do
     [[ ! -d "$d/.git" ]] || fail "a .git dir appeared in $d (git was invoked?)"
 done
 pass "ran entirely in non-git dirs; no .git created"
 
 echo ""
-echo "PASS: upgrade shim migrates OLD layout once, preserves data, converges partial trees, and is idempotent."
+echo "PASS: upgrade shim moves the OLD notebook without data loss, migrates cursor + archive, converges partial trees, and is idempotent."

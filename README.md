@@ -12,20 +12,18 @@ structured notebook logging (queryable history, pattern discovery). See also
 
 ## Prerequisites
 
-Ralph depends on the [`lab-notebook`](https://github.com/carbonscott/lab-notebook)
-CLI being on `$PATH` — it's called on every iteration (notebook init,
-emit, sql). Install it first:
+Ralph depends on the [`lnb`](https://github.com/carbonscott/lab-notebook)
+CLI being on `$PATH` — it's called on every iteration (`note` and `log`).
+`lnb` is a single self-contained script (`lnb.py`); install it by symlinking
+it onto your `$PATH`:
 
 ```bash
-# Recommended (isolated install):
-uv tool install git+https://github.com/carbonscott/lab-notebook
-
-# Or with pip:
-pip install git+https://github.com/carbonscott/lab-notebook
+git clone https://github.com/carbonscott/lab-notebook ~/codes/lab-notebook
+ln -s ~/codes/lab-notebook/lnb.py ~/.local/bin/lnb
 ```
 
-Verify with `lab-notebook --help`. Update later with
-`uv tool install --force git+https://github.com/carbonscott/lab-notebook`.
+Verify with `lnb --help`. Update later by pulling in
+`~/codes/lab-notebook` — the symlink always points at the latest `lnb.py`.
 
 ## Install
 
@@ -83,8 +81,8 @@ those old paths were committed to git, ralph prints a `git rm --cached
 entries now that their content lives under the gitignored `.ralph/`
 (ralph never runs git itself).
 
-The runner auto-initializes `.ralph/.lnb` with the coding schema on the
-first iteration — no manual `lab-notebook init` needed.
+The notebook needs no init at all — `.ralph/.lnb` is auto-created on the
+first `lnb note`.
 
 Then pick one runner:
 
@@ -182,7 +180,6 @@ The repo splits into four directories so the mode boundary is obvious:
 | `shared/ralph-lib.sh` | Shared bash helpers sourced by both runners |
 | `shared/PROMPT.md` | Prompt template with `<!-- FILL:xxx -->` markers |
 | `shared/tasks.json.example` | Starter task file (copy to your project as `tasks.json`) |
-| `shared/coding-dev.yaml` | Lab-notebook schema for code dev workflows |
 
 ## Task File Format
 
@@ -214,9 +211,10 @@ flipping `"passes": false` to `"passes": true`.
 The agent finds the first story with `"passes": false` (by priority),
 implements it, sets `"passes": true`, and emits a promise.
 
-## Notebook Schema
+## Notebook Entry Types
 
-The `coding-dev.yaml` schema provides entry types tailored for coding:
+lnb validates nothing — these are just the conventional `+type` values the
+harness and prompt emit for coding work:
 
 | Type | When to use |
 |------|------------|
@@ -233,8 +231,7 @@ The `coding-dev.yaml` schema provides entry types tailored for coding:
 
 Query patterns from all iterations:
 ```bash
-LAB_NOTEBOOK_DIR=.ralph/.lnb lab-notebook sql \
-  "SELECT content FROM entries WHERE type='pattern' ORDER BY ts"
+LNB_DIR=.ralph/.lnb lnb log | jq -r 'select(.type=="pattern").content'
 ```
 
 ## Headless runner options (ralph)
@@ -274,10 +271,10 @@ notebook spanning several worktrees so each loop can learn from the others),
 point them all at one path with `--notebook <shared-path>`. There is no extra
 flag: ralph attributes every entry to a per-loop writer
 `ralph-<branch>` (the branch slug from `tasks.json`, e.g. branch `ralph/foo`
-&rarr; writer `ralph-foo`), via `LAB_NOTEBOOK_WRITER` set on each
-`lab-notebook emit` call. Because the notebook stores one append-only
-`entries/<writer>.jsonl` per writer, concurrent loops on different branches
-never collide — each writes its own file, and a single `lab-notebook sql`
-query still sees them all. (Two loops sharing **one** branch in **one** cwd
+&rarr; writer `ralph-foo`), via `LNB_WRITER` set on each
+`lnb note` call. Because the notebook stores one append-only
+`.lnb/<writer>.jsonl` per writer, concurrent loops on different branches
+never collide — each writes its own file, and `lnb log` merges every
+`.lnb/<writer>.jsonl`. (Two loops sharing **one** branch in **one** cwd
 still share both the prompt file and the writer; real isolation is separate
 cwds/worktrees and/or distinct branches.)

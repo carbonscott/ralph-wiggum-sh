@@ -4,8 +4,8 @@
 # functions below also use BRANCH and PROJECT, which callers typically
 # resolve via read_task_meta after sourcing.
 #
-# SHARED_DIR must point at the repo's shared/ directory so ensure_notebook
-# can locate coding-dev.yaml. Both runners set it as "$SCRIPT_DIR/../shared".
+# SHARED_DIR must point at the repo's shared/ directory so the runners can
+# locate PROMPT.md and tasks.json.example. Both set it as "$SCRIPT_DIR/../shared".
 #
 # STATE_FILE is the gitignored batch cursor (.ralph/state.json). It is the
 # successor to the leaking flat-file branch cursor it replaces. Schema
@@ -43,7 +43,7 @@ branch_slug() {
 # BRANCH for the prompt-diff test. Defaults to "main" (same as build_prompt's
 # branch default). E.g. ralph/foo -> ralph-foo, ralph/smoke-test ->
 # ralph-smoke-test, feature/x -> ralph-feature-x, <unset> -> ralph-main.
-# Set as a PROCESS ENV VAR on the lab-notebook emit call, never in .lnb.env.
+# Set as a PROCESS ENV VAR (LNB_WRITER) on the `lnb note` call.
 notebook_writer() {
     echo "ralph-$(branch_slug "${BRANCH:-main}")"
 }
@@ -146,7 +146,6 @@ archive_previous_run() {
 # --- One-time upgrade shim: OLD layout -> .ralph/ layout ---
 # Older installs scattered ralph state across the project root:
 #   ./.lnb/            the notebook        -> .ralph/.lnb
-#   ./.lnb.env         pointer (abs path)  -> rewritten to point at .ralph/.lnb
 #   ./.ralph-last-branch  bare branch cursor -> .ralph/state.json
 #   ./archive/         old snapshots       -> .ralph/archive
 #
@@ -164,7 +163,7 @@ archive_previous_run() {
 migrate_old_layout() {
     # Nothing to do unless at least one OLD-layout artifact is present. Avoids
     # creating a stray .ralph/ on fresh projects (the shim must be inert there).
-    if [[ ! -e ./.lnb && ! -e ./.lnb.env && ! -e ./.ralph-last-branch && ! -e ./archive ]]; then
+    if [[ ! -e ./.lnb && ! -e ./.ralph-last-branch && ! -e ./archive ]]; then
         return 0
     fi
 
@@ -172,36 +171,17 @@ migrate_old_layout() {
     local migrated_tracked=0
 
     # 1) Notebook: MOVE ./.lnb -> .ralph/.lnb (never re-init over it). Guarded so
-    #    a second run (target present) is a no-op. The pointer is reconciled
-    #    separately below so an interrupted move (moved, but died before the
-    #    pointer rewrite) still converges on a later run.
+    #    a second run (target present) is a no-op. `lnb` needs no pointer file —
+    #    the harness passes LNB_DIR on every call — so nothing else to reconcile.
     if [[ -d ./.lnb && ! -e .ralph/.lnb ]]; then
-        local abs_nb
         mv ./.lnb .ralph/.lnb
-        abs_nb="$(cd .ralph/.lnb && pwd)"
-        write_notebook_pointer "$abs_nb"
-        echo "Migrated notebook: ./.lnb -> .ralph/.lnb (pointer .lnb.env -> $abs_nb)" >&2
+        echo "Migrated notebook: ./.lnb -> .ralph/.lnb" >&2
     elif [[ -d ./.lnb && -d .ralph/.lnb ]]; then
         # Both old and new notebooks exist — an earlier interrupted run or manual
         # state stranded ./.lnb. We never auto-merge or delete history; warn
         # loudly so the user reconciles, otherwise ./.lnb is silently ignored.
         echo "WARNING: both ./.lnb and .ralph/.lnb exist; ./.lnb is left in place and its history is NOT used." >&2
         echo "  Reconcile manually, then 'rm -rf ./.lnb' once you've confirmed .ralph/.lnb is the notebook to keep." >&2
-    fi
-
-    # Reconcile the .lnb.env pointer even when the MOVE happened in a prior
-    # (possibly interrupted) run that died before rewriting it: if the notebook
-    # lives at .ralph/.lnb but the pointer resolves to a missing dir, repoint it.
-    # Idempotent — a pointer already resolving to a real dir is left untouched,
-    # so a deliberate custom LAB_NOTEBOOK_DIR is never clobbered.
-    if [[ -d .ralph/.lnb && -f ./.lnb.env ]]; then
-        local abs_nb cur_dir
-        abs_nb="$(cd .ralph/.lnb && pwd)"
-        cur_dir="$(sed -n 's|^[[:space:]]*\(export[[:space:]]\+\)\?LAB_NOTEBOOK_DIR=\(.*\)|\2|p' ./.lnb.env | head -1)"
-        if [[ -n "$cur_dir" && ! -d "$cur_dir" ]]; then
-            write_notebook_pointer "$abs_nb"
-            echo "Reconciled stale notebook pointer: .lnb.env -> $abs_nb" >&2
-        fi
     fi
 
     # 2) Cursor: translate ./.ralph-last-branch (a bare branch string) into
@@ -237,45 +217,16 @@ migrate_old_layout() {
     fi
 }
 
-# Write/replace the LAB_NOTEBOOK_DIR line in ./.lnb.env so it points at $1 (an
-# absolute notebook dir), matching the `export LAB_NOTEBOOK_DIR=<abs>` format
-# `lab-notebook init` writes (lab-notebook parses only that key). Surgically
-# replaces just that line if present (preserving the comment + any
-# LAB_NOTEBOOK_WRITER line); otherwise (re)writes the pointer in canonical init
-# format. The replacement is escaped so a `\`, `&`, or the `|` sed delimiter in
-# the path can't corrupt the expression.
-write_notebook_pointer() {
-    local abs_nb="$1" esc tmp_env
-    if [[ -f ./.lnb.env ]] && grep -q '^[[:space:]]*\(export[[:space:]]\+\)\?LAB_NOTEBOOK_DIR=' ./.lnb.env; then
-        # Escape sed-replacement metacharacters; backslashes FIRST so the ones we
-        # add below aren't doubled again.
-        esc=${abs_nb//\\/\\\\}
-        esc=${esc//&/\\&}
-        esc=${esc//|/\\|}
-        tmp_env="$(mktemp ./.lnb.env.XXXXXX)"
-        sed "s|^\([[:space:]]*\(export[[:space:]]\+\)\?\)LAB_NOTEBOOK_DIR=.*|\1LAB_NOTEBOOK_DIR=$esc|" \
-            ./.lnb.env > "$tmp_env"
-        mv "$tmp_env" ./.lnb.env
-    else
-        printf '# Project-local lab-notebook configuration\nexport LAB_NOTEBOOK_DIR=%s\n' \
-            "$abs_nb" > ./.lnb.env
-    fi
-}
-
 # --- Notebook helpers ---
 ensure_notebook() {
     # Migrate any OLD-layout state in place BEFORE the fresh-init check, so we
     # never init a fresh empty .ralph/.lnb over a user's existing notebook.
     migrate_old_layout
     if [[ ! -d "$NOTEBOOK_DIR" ]]; then
-        # `lab-notebook init .ralph` forces a `/.lnb` leaf and writes a root
-        # .lnb.env pointing at it with an ABSOLUTE path, plus the notebook's
-        # own .gitignore — all in one call. That lands the notebook directly
-        # at .ralph/.lnb (the NOTEBOOK_DIR default), so no separate mv + sed
-        # patch of .lnb.env is needed.
-        mkdir -p .ralph
-        lab-notebook init .ralph --template-path "$SHARED_DIR/coding-dev.yaml" >/dev/null
-
+        # `lnb` needs no init: it auto-creates the notebook at $LNB_DIR on the
+        # first `lnb note`. We only ensure the dir exists so the `[[ -d ... ]]`
+        # guards in log_to_notebook/query_recent_history pass. No schema/template.
+        mkdir -p "$NOTEBOOK_DIR"
         echo "Initialized notebook at $NOTEBOOK_DIR" >&2
     fi
 }
@@ -283,28 +234,38 @@ ensure_notebook() {
 log_to_notebook() {
     local entry_type="$1"
     local message="$2"
-    if command -v lab-notebook &>/dev/null && [[ -d "$NOTEBOOK_DIR" ]]; then
+    if command -v lnb &>/dev/null && [[ -d "$NOTEBOOK_DIR" ]]; then
         # Attribute the entry to a per-loop writer (ralph-<branch-slug>), set as
         # a process env var on the same command line so it is exported into the
-        # lab-notebook subprocess. This keeps several worktrees/loops pointed at
-        # one shared --notebook contention-free (per-writer JSONL).
-        LAB_NOTEBOOK_DIR="$NOTEBOOK_DIR" LAB_NOTEBOOK_WRITER="$(notebook_writer)" \
-            lab-notebook emit \
-            --context "$CONTEXT" --type "$entry_type" \
-            --branch "${BRANCH:-}" --tags "ralph-harness" \
-            "$message" 2>/dev/null || true
+        # lnb subprocess. This keeps several worktrees/loops pointed at one
+        # shared notebook contention-free (per-writer JSONL). Content string
+        # LEADS; branch/tags are key=value writer fields, not flags.
+        LNB_DIR="$NOTEBOOK_DIR" LNB_WRITER="$(notebook_writer)" \
+            lnb note "$message" \
+            --type "$entry_type" --context "$CONTEXT" \
+            branch="${BRANCH:-}" tags=ralph-harness \
+            2>/dev/null || true
     fi
 }
 
 query_recent_history() {
-    if command -v lab-notebook &>/dev/null && [[ -d "$NOTEBOOK_DIR" ]]; then
-        # Double up any single quotes in CONTEXT (SQL-standard escape)
-        # so a branch like ralph/feature's-test can't break out of the
-        # WHERE clause.
-        local escaped_context="${CONTEXT//\'/\'\'}"
-        LAB_NOTEBOOK_DIR="$NOTEBOOK_DIR" lab-notebook sql \
-            "SELECT ts, type, issue, substr(content,1,200) FROM entries WHERE context='$escaped_context' ORDER BY ts DESC LIMIT 10" \
-            2>/dev/null || echo "(no history yet)"
+    if command -v lnb &>/dev/null && [[ -d "$NOTEBOOK_DIR" ]]; then
+        # `lnb log` streams every record as JSONL ascending by ts. Filter to this
+        # context, trim content to 200 chars, keep the 10 most recent (tail), then
+        # flip to descending (tac) to match the old ORDER BY ts DESC LIMIT 10.
+        # --arg keeps CONTEXT out of the jq program (no injection/quoting hazard).
+        local history
+        history=$(LNB_DIR="$NOTEBOOK_DIR" lnb log 2>/dev/null \
+            | jq -c --arg ctx "$CONTEXT" \
+                'select(.context==$ctx) | {ts,type,issue,content:(.content[0:200])}' \
+            | tail -n 10 | tac) || true
+        # `lnb log` prints nothing on an empty/absent notebook, so the old
+        # `|| echo` fallback can't fire — restore it explicitly when empty.
+        if [[ -n "$history" ]]; then
+            echo "$history"
+        else
+            echo "(no history yet)"
+        fi
     else
         echo "(notebook not available)"
     fi
