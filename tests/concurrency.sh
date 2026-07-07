@@ -80,7 +80,7 @@ echo "== Two loops on different branches emit CONCURRENTLY into ONE shared noteb
 # Background BOTH emits and wait for the pair, so the two writers append at the
 # same time — a genuine race. Each runs in its own subshell, so emit_as's local
 # BRANCH/CONTEXT for one loop can't leak into the other. Per-writer isolation
-# (distinct entries/ralph-<branch>.jsonl) makes this deterministically safe.
+# (distinct .lnb/ralph-<branch>.jsonl) makes this deterministically safe.
 emit_as "ralph/loop-a" "loop A: entry from branch a" & pid_a=$!
 emit_as "ralph/loop-b" "loop B: entry from branch b" & pid_b=$!
 # wait per-pid so a failed background emit fails the test (bare `wait` swallows it).

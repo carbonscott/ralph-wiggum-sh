@@ -168,7 +168,7 @@ PROMPT_OUT=".ralph/prompt.md"
 build_prompt "$history" > "$PROMPT_OUT"
 echo "Wrote iteration $ITERATION prompt to $PROMPT_OUT"
 
-# Route lab-notebook's start-entry output to stderr so stdout stays a single status line.
+# Route lnb's start-entry output to stderr so stdout stays a single status line.
 if [[ -n "$MAX_ITERATIONS" ]]; then
     log_to_notebook "start" "ralph-lnb: starting iteration $ITERATION/$MAX_ITERATIONS" >&2
 else

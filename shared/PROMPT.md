@@ -75,7 +75,7 @@ lnb log | jq -r --arg c '<!-- FILL:context -->' 'select(.context==$c and .type==
 lnb log | jq -s --arg c '<!-- FILL:context -->' '[.[]|select(.context==$c and .type=="done").issue] as $d | .[] | select(.context==$c and .type=="start" and (.issue|IN($d[])|not)) | {issue,content}'
 
 # Check what files were changed for a related story
-lnb log | jq -c --arg c '<!-- FILL:context -->' 'select(.context==$c and ((.files_changed//"")|test("auth.py"))) | {ts,type,content}'
+lnb log | jq -c --arg c '<!-- FILL:context -->' 'select(.context==$c and ((.files_changed//"")|test("auth\\.py"))) | {ts,type,content}'
 
 # Free-text search across all entries
 lnb log | jq -c 'select((.content//"")|test("migration")) | {ts,type,content:(.content[0:200])}'

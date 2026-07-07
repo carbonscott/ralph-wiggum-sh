@@ -22,7 +22,7 @@ Exercises both modes so you can verify the `/ralph-lnb` skill and
   `bash tests/archive.sh` (exits 0 on pass).
 - `concurrency.sh` — proves the per-loop writer design: two loops on different
   branches pointed at one shared notebook each emit, concurrently, under their
-  own `ralph-<branch>` writer, landing in distinct `entries/ralph-*.jsonl`
+  own `ralph-<branch>` writer, landing in distinct `.lnb/ralph-*.jsonl`
   files with nothing lost. Run with `bash tests/concurrency.sh` (exits 0 on
   pass; SKIPs cleanly if `lnb` is not on `$PATH`).
 - `upgrade.sh` — exercises `migrate_old_layout`, the one-time shim that moves

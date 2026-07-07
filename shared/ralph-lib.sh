@@ -240,6 +240,10 @@ log_to_notebook() {
         # lnb subprocess. This keeps several worktrees/loops pointed at one
         # shared notebook contention-free (per-writer JSONL). Content string
         # LEADS; branch/tags are key=value writer fields, not flags.
+        # Constraint: $message must NOT begin with +, #, @, - or match key=value
+        # (lnb would parse it as a sigil/field, not content, and die "nothing to
+        # log"; the 2>/dev/null || true below would then swallow it silently).
+        # All harness callers pass fixed "ralph.sh:"/"ralph-lnb:" strings — safe.
         LNB_DIR="$NOTEBOOK_DIR" LNB_WRITER="$(notebook_writer)" \
             lnb note "$message" \
             --type "$entry_type" --context "$CONTEXT" \
@@ -250,15 +254,16 @@ log_to_notebook() {
 
 query_recent_history() {
     if command -v lnb &>/dev/null && [[ -d "$NOTEBOOK_DIR" ]]; then
-        # `lnb log` streams every record as JSONL ascending by ts. Filter to this
-        # context, trim content to 200 chars, keep the 10 most recent (tail), then
-        # flip to descending (tac) to match the old ORDER BY ts DESC LIMIT 10.
+        # `lnb log` streams every record as JSONL ascending by ts. Slurp (-s),
+        # filter to this context, trim content to 200 chars, keep the 10 most
+        # recent, then reverse to descending to match the old
+        # ORDER BY ts DESC LIMIT 10 — all inside jq, so no coreutils tail/tac
+        # dependency (and no stray "tac: not found" on non-GNU systems).
         # --arg keeps CONTEXT out of the jq program (no injection/quoting hazard).
         local history
         history=$(LNB_DIR="$NOTEBOOK_DIR" lnb log 2>/dev/null \
-            | jq -c --arg ctx "$CONTEXT" \
-                'select(.context==$ctx) | {ts,type,issue,content:(.content[0:200])}' \
-            | tail -n 10 | tac) || true
+            | jq -c -s --arg ctx "$CONTEXT" \
+                '[ .[] | select(.context==$ctx) | {ts,type,issue,content:(.content[0:200])} ] | .[-10:] | reverse | .[]') || true
         # `lnb log` prints nothing on an empty/absent notebook, so the old
         # `|| echo` fallback can't fire — restore it explicitly when empty.
         if [[ -n "$history" ]]; then
